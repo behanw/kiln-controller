@@ -23,9 +23,9 @@ log.info("Starting kiln controller")
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
-profile_path = config.kiln_profiles_directory
 
-from oven import SimulatedOven, RealOven, Profile
+from profile import Profile
+from oven import SimulatedOven, RealOven
 from ovenWatcher import OvenWatcher
 
 app = bottle.Bottle()
@@ -78,7 +78,7 @@ def handle_api():
             allow_seek = False
 
         # get the wanted profile/kiln schedule
-        profile_obj = find_profile(wanted)
+        profile_obj = Profile.find_profile(wanted)
         if profile_obj is None:
             return { "success" : False, "error" : "profile %s not found" % wanted }
 
@@ -112,21 +112,6 @@ def handle_api():
                 return json.dumps(oven.pid.pidstats)
 
     return { "success" : True }
-
-def find_profile(wanted):
-    '''
-    given a wanted profile name, find it and return the parsed
-    json profile object or None.
-    '''
-    #load all profiles from disk
-    profiles = get_profiles()
-    json_profiles = json.loads(profiles)
-
-    # find the wanted profile
-    for profile in json_profiles:
-        if profile['name'] == wanted:
-            return profile
-    return None
 
 @app.route('/picoreflow/:filename#.*#')
 def send_static(filename):
@@ -197,14 +182,14 @@ def handle_storage():
 
             if message == "GET":
                 log.info("GET command received")
-                wsock.send(get_profiles())
+                wsock.send(Profile.get_profiles())
             elif msgdict.get("cmd") == "DELETE":
                 log.info("DELETE command received")
                 profile_obj = msgdict.get('profile')
-                if delete_profile(profile_obj):
+                if Profile.delete_profile(profile_obj):
                   msgdict["resp"] = "OK"
                 wsock.send(json.dumps(msgdict))
-                #wsock.send(get_profiles())
+                #wsock.send(Profile.get_profiles())
             elif msgdict.get("cmd") == "PUT":
                 log.info("PUT command received")
                 profile_obj = msgdict.get('profile')
@@ -212,14 +197,14 @@ def handle_storage():
                 force = True
                 if profile_obj:
                     #del msgdict["cmd"]
-                    if save_profile(profile_obj, force):
+                    if Profile.save_profile(profile_obj, force):
                         msgdict["resp"] = "OK"
                     else:
                         msgdict["resp"] = "FAIL"
                     log.debug("websocket (storage) sent: %s" % message)
 
                     wsock.send(json.dumps(msgdict))
-                    wsock.send(get_profiles())
+                    wsock.send(Profile.get_profiles())
             time.sleep(1) 
         except WebSocketError:
             break
@@ -254,81 +239,6 @@ def handle_status():
         time.sleep(1)
     log.info("websocket (status) closed")
 
-
-def get_profiles():
-    try:
-        profile_files = os.listdir(profile_path)
-    except:
-        profile_files = []
-    profiles = []
-    for filename in profile_files:
-        with open(os.path.join(profile_path, filename), 'r') as f:
-            profiles.append(json.load(f))
-    profiles = normalize_temp_units(profiles)
-    return json.dumps(profiles)
-
-
-def save_profile(profile, force=False):
-    profile=add_temp_units(profile)
-    profile_json = json.dumps(profile)
-    filename = profile['name']+".json"
-    filepath = os.path.join(profile_path, filename)
-    if not force and os.path.exists(filepath):
-        log.error("Could not write, %s already exists" % filepath)
-        return False
-    with open(filepath, 'w+') as f:
-        f.write(profile_json)
-        f.close()
-    log.info("Wrote %s" % filepath)
-    return True
-
-def add_temp_units(profile):
-    """
-    always store the temperature in degrees c
-    this way folks can share profiles
-    """
-    if "temp_units" in profile:
-        return profile
-    profile['temp_units']="c"
-    if config.temp_scale=="c":
-        return profile
-    if config.temp_scale=="f":
-        profile=convert_to_c(profile);
-        return profile
-
-def convert_to_c(profile):
-    newdata=[]
-    for (secs,temp) in profile["data"]:
-        temp = (5/9)*(temp-32)
-        newdata.append((secs,temp))
-    profile["data"]=newdata
-    return profile
-
-def convert_to_f(profile):
-    newdata=[]
-    for (secs,temp) in profile["data"]:
-        temp = ((9/5)*temp)+32
-        newdata.append((secs,temp))
-    profile["data"]=newdata
-    return profile
-
-def normalize_temp_units(profiles):
-    normalized = []
-    for profile in profiles:
-        if "temp_units" in profile:
-            if config.temp_scale == "f" and profile["temp_units"] == "c": 
-                profile = convert_to_f(profile)
-                profile["temp_units"] = "f"
-        normalized.append(profile)
-    return normalized
-
-def delete_profile(profile):
-    profile_json = json.dumps(profile)
-    filename = profile['name']+".json"
-    filepath = os.path.join(profile_path, filename)
-    os.remove(filepath)
-    log.info("Deleted %s" % filepath)
-    return True
 
 def get_config():
     return json.dumps({"temp_scale": config.temp_scale,
