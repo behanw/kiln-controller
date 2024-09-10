@@ -532,8 +532,8 @@ class Oven(threading.Thread):
 
         log.info("automatically restarting profile = %s at minute = %d" % (profile_path,startat))
         with open(profile_path) as infile:
-            profile_json = json.dumps(json.load(infile))
-        profile = Profile(profile_json)
+            profile_obj = json.load(infile)
+        profile = Profile(profile_obj)
         self.run_profile(profile, startat=startat, allow_seek=False)  # We don't want a seek on an auto restart.
         self.cost = d["cost"]
         time.sleep(1)
@@ -730,8 +730,7 @@ class RealOven(Oven):
             pass
 
 class Profile():
-    def __init__(self, json_data):
-        obj = json.loads(json_data)
+    def __init__(self, obj):
         self.name = obj["name"]
         self.data = sorted(obj["data"])
 

@@ -78,13 +78,12 @@ def handle_api():
             allow_seek = False
 
         # get the wanted profile/kiln schedule
-        profile = find_profile(wanted)
-        if profile is None:
+        profile_obj = find_profile(wanted)
+        if profile_obj is None:
             return { "success" : False, "error" : "profile %s not found" % wanted }
 
         # FIXME juggling of json should happen in the Profile class
-        profile_json = json.dumps(profile)
-        profile = Profile(profile_json)
+        profile = Profile(profile_obj)
         oven.run_profile(profile, startat=startat, allow_seek=allow_seek)
         ovenWatcher.record(profile)
 
@@ -157,16 +156,14 @@ def handle_control():
                     log.info("RUN command received")
                     profile_obj = msgdict.get('profile')
                     if profile_obj:
-                        profile_json = json.dumps(profile_obj)
-                        profile = Profile(profile_json)
+                        profile = Profile(profile_obj)
                     oven.run_profile(profile)
                     ovenWatcher.record(profile)
                 elif msgdict.get("cmd") == "SIMULATE":
                     log.info("SIMULATE command received")
                     #profile_obj = msgdict.get('profile')
                     #if profile_obj:
-                    #    profile_json = json.dumps(profile_obj)
-                    #    profile = Profile(profile_json)
+                    #    profile = Profile(profile_obj)
                     #simulated_oven = Oven(simulate=True, time_step=0.05)
                     #simulation_watcher = OvenWatcher(simulated_oven)
                     #simulation_watcher.add_observer(wsock)
