@@ -78,12 +78,14 @@ def handle_api():
             allow_seek = False
 
         # get the wanted profile/kiln schedule
-        profile_obj = Profile.find_profile(wanted)
-        if profile_obj is None:
-            return { "success" : False, "error" : "profile %s not found" % wanted }
+        try:
+            profile = Profile.load(wanted)
+        except FileNotFoundError:
+            return { "success" : False, "error" : "profile {} not found".format(wanted) }
+        except e:
+            raise(e)
 
         # FIXME juggling of json should happen in the Profile class
-        profile = Profile(profile_obj)
         oven.run_profile(profile, startat=startat, allow_seek=allow_seek)
         ovenWatcher.record(profile)
 
@@ -182,29 +184,27 @@ def handle_storage():
 
             if message == "GET":
                 log.info("GET command received")
-                wsock.send(Profile.get_profiles())
+                wsock.send(Profile.get_all_json())
             elif msgdict.get("cmd") == "DELETE":
                 log.info("DELETE command received")
                 profile_obj = msgdict.get('profile')
-                if Profile.delete_profile(profile_obj):
+                if Profile.delete(profile_obj):
                   msgdict["resp"] = "OK"
                 wsock.send(json.dumps(msgdict))
-                #wsock.send(Profile.get_profiles())
+                #wsock.send(Profile.get_all_json())
             elif msgdict.get("cmd") == "PUT":
                 log.info("PUT command received")
                 profile_obj = msgdict.get('profile')
-                #force = msgdict.get('force', False)
-                force = True
                 if profile_obj:
                     #del msgdict["cmd"]
-                    if Profile.save_profile(profile_obj, force):
+                    if Profile.save(profile_obj):
                         msgdict["resp"] = "OK"
                     else:
                         msgdict["resp"] = "FAIL"
                     log.debug("websocket (storage) sent: %s" % message)
 
                     wsock.send(json.dumps(msgdict))
-                    wsock.send(Profile.get_profiles())
+                    wsock.send(Profile.get_all_json())
             time.sleep(1) 
         except WebSocketError:
             break

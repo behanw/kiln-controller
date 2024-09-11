@@ -10,6 +10,8 @@ import busio
 import adafruit_bitbangio as bitbangio
 import statistics
 
+from profile import Profile
+
 log = logging.getLogger(__name__)
 
 class DupFilter(object):

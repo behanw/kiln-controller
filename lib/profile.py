@@ -1,5 +1,6 @@
 import config
 import json
+import math
 import os
 
 import logging
@@ -8,45 +9,49 @@ log = logging.getLogger("kiln-controller")
 
 profile_path = config.kiln_profiles_directory
 
-def convert_to_c(profile):
-    newdata=[]
-    for (secs,temp) in profile["data"]:
-        temp = (5/9)*(temp-32)
-        newdata.append((secs,temp))
-    profile["data"]=newdata
+def convert_temp(temp, converto):
+    if converto == 'c':
+        temp = round((temp - 32) * 5 / 9)
+    else:
+        temp = math.ceil(temp * 9 / 5 + 32)
+    return temp
+
+def convert_profile(profile, converto):
+    if profile["temp_units"] == converto:
+        return profile
+    profile["data"] = [ [duration, convert_temp(temp, converto)] for (duration, temp) in profile["data"] ]
+    profile["temp_units"] = converto
     return profile
 
-def convert_to_f(profile):
-    newdata=[]
-    for (secs,temp) in profile["data"]:
-        temp = ((9/5)*temp)+32
-        newdata.append((secs,temp))
-    profile["data"]=newdata
-    return profile
+def convert_to_temp_scale(profile):
+    if "temp_units" not in profile:
+        profile["temp_units"] = 'f'
+    if config.temp_scale == profile["temp_units"]:
+        return profile
+    elif config.temp_scale == 'f' and profile["temp_units"] == 'c':
+        return convert_profile(profile, 'f')
+    else:
+        return convert_profile(profile, 'c')
 
 def add_temp_units(profile):
     """
     always store the temperature in degrees c
     this way folks can share profiles
     """
-    if "temp_units" in profile:
-        return profile
-    profile['temp_units']="c"
-    if config.temp_scale=="c":
-        return profile
-    if config.temp_scale=="f":
-        profile=convert_to_c(profile);
-        return profile
+    profile['temp_units'] = config.temp_scale
+    return convert_profile(profile, 'c')
 
-def normalize_temp_units(profiles):
-    normalized = []
-    for profile in profiles:
-        if "temp_units" in profile:
-            if config.temp_scale == "f" and profile["temp_units"] == "c": 
-                profile = convert_to_f(profile)
-                profile["temp_units"] = "f"
-        normalized.append(profile)
-    return normalized
+def get_filename(name):
+    if not name.endswith(".json"):
+        name += ".json"
+    return os.path.join(profile_path, name)
+
+def read_profile(name):
+    with open(get_filename(name), 'r') as f:
+        return(convert_to_temp_scale(json.load(f)))
+
+def read_all():
+    return [ read_profile(name) for name in os.listdir(profile_path) ]
 
 class Profile():
     def __init__(self, obj):
@@ -54,56 +59,29 @@ class Profile():
         self.data = sorted(obj["data"])
 
     @staticmethod
-    def get_profiles():
-        try:
-            profile_files = os.listdir(profile_path)
-        except:
-            profile_files = []
-        profiles = []
-        for filename in profile_files:
-            with open(os.path.join(profile_path, filename), 'r') as f:
-                profiles.append(json.load(f))
-        profiles = normalize_temp_units(profiles)
-        return json.dumps(profiles)
+    def load(name):
+        return Profile(read_profile(name))
 
     @staticmethod
-    def find_profile(wanted):
-        '''
-        given a wanted profile name, find it and return the parsed
-        json profile object or None.
-        '''
-        #load all profiles from disk
-        profiles = get_profiles()
-        json_profiles = json.loads(profiles)
-
-        # find the wanted profile
-        for profile in json_profiles:
-            if profile['name'] == wanted:
-                return profile
-        return None
+    def get_all_json():
+        return json.dumps(read_all())
 
     @staticmethod
-    def save_profile(profile, force=False):
-        profile=add_temp_units(profile)
-        profile_json = json.dumps(profile)
-        filename = profile['name']+".json"
-        filepath = os.path.join(profile_path, filename)
+    def save(profile, force=True):
+        filepath = get_filename(profile["name"])
         if not force and os.path.exists(filepath):
-            log.error("Could not write, %s already exists" % filepath)
+            log.error("Could not write, {} already exists".format(filepath))
             return False
         with open(filepath, 'w+') as f:
-            f.write(profile_json)
-            f.close()
-        log.info("Wrote %s" % filepath)
+            f.write(json.dumps(add_temp_units(profile)))
+        log.info("Wrote {}".format(filepath))
         return True
 
     @staticmethod
-    def delete_profile(profile):
-        profile_json = json.dumps(profile)
-        filename = profile['name']+".json"
-        filepath = os.path.join(profile_path, filename)
+    def delete(profile):
+        filepath = get_filename(profile["name"])
         os.remove(filepath)
-        log.info("Deleted %s" % filepath)
+        log.info("Deleted {}".format(filepath))
         return True
 
     def get_duration(self):
