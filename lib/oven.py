@@ -350,6 +350,15 @@ class Oven(threading.Thread):
         self.catching_up = False
 
     @staticmethod
+    def getOven():
+        if config.simulate == True:
+            log.info("this is a simulation")
+            return SimulatedOven()
+        else:
+            log.info("this is a real kiln")
+            return RealOven()
+
+    @staticmethod
     def get_start_from_temperature(profile, temp):
         target_temp = profile.get_target_temperature(0)
         if temp > target_temp + 5:

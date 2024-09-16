@@ -22,7 +22,7 @@ def recordprofile(csvfile, targettemp):
     script_dir = os.path.dirname(os.path.realpath(__file__))
     sys.path.insert(0, script_dir + '/lib/')
 
-    from oven import RealOven, SimulatedOven
+    from oven import Oven
 
     # open the file to log data to
     f = open(csvfile, 'w')
@@ -30,11 +30,9 @@ def recordprofile(csvfile, targettemp):
     csvout.writerow(['time', 'temperature'])
 
     # construct the oven
+    oven = Oven.getOven()
     if config.simulate:
-        oven = SimulatedOven()
         oven.target = targettemp * 2 # insures max heating for simulation
-    else:
-        oven = RealOven()
 
     # Main loop:
     #

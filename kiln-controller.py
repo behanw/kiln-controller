@@ -25,17 +25,12 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
 
 from profile import Profile
-from oven import SimulatedOven, RealOven
+from oven import Oven
 from ovenWatcher import OvenWatcher
 
 app = bottle.Bottle()
 
-if config.simulate == True:
-    log.info("this is a simulation")
-    oven = SimulatedOven()
-else:
-    log.info("this is a real kiln")
-    oven = RealOven()
+oven = Oven.getOven()
 ovenWatcher = OvenWatcher(oven)
 # this ovenwatcher is used in the oven class for restarts
 oven.set_ovenwatcher(ovenWatcher)
