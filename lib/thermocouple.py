@@ -2,8 +2,6 @@ import threading
 import time
 import logging
 import config
-import digitalio
-import adafruit_bitbangio as bitbangio
 import statistics
 
 log = logging.getLogger(__name__)
@@ -95,13 +93,17 @@ class ThermocoupleReal(Thermocouple):
         Thermocouple.__init__(self)
         self.sleeptime = self.time_step / float(config.temperature_average_samples)
         self.temptracker = TempTracker() 
+
         self.spi_setup()
+
+        import digitalio
         self.cs = digitalio.DigitalInOut(config.spi_cs)
 
     def spi_setup(self):
         if(hasattr(config,'spi_sclk') and
            hasattr(config,'spi_mosi') and
            hasattr(config,'spi_miso')):
+            import adafruit_bitbangio as bitbangio
             self.spi = bitbangio.SPI(config.spi_sclk, config.spi_mosi, config.spi_miso)
             log.info("Software SPI selected for reading thermocouple")
         else:
