@@ -242,12 +242,20 @@ def get_config():
         "currency_type": config.currency_type})    
 
 def main():
-    ip = "0.0.0.0"
+    ssl_args = {}
+    if hasattr(config, 'https_certfile') and hasattr(config, 'https_keyfile'):
+        ssl_args = {
+            'certfile': config.https_certfile,
+            'keyfile': config.https_keyfile
+        }
+        log.info("Configuring for https using {}".format(config.https_certfile))
+
+    ip = config.incoming_ip or "0.0.0.0"
     port = config.listening_port
     log.info("listening on %s:%d" % (ip, port))
 
     server = WSGIServer((ip, port), app,
-                        handler_class=WebSocketHandler)
+                        handler_class=WebSocketHandler, **ssl_args)
     server.serve_forever()
 
 
