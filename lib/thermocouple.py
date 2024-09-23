@@ -59,9 +59,9 @@ class ThermocoupleTracker(object):
             return True
         return False
 
-class TempSensor(threading.Thread):
+class Thermocouple(threading.Thread):
     '''Used by the Board class. Each Board must have
-    a TempSensor.
+    a Thermocouple.
     '''
     def __init__(self):
         threading.Thread.__init__(self)
@@ -69,22 +69,33 @@ class TempSensor(threading.Thread):
         self.time_step = config.sensor_time_wait
         self.status = ThermocoupleTracker()
 
-class TempSensorSimulated(TempSensor):
+    @staticmethod
+    def get():
+        if config.simulate == True:
+            return ThermocoupleSimulated()
+        elif config.max31855:
+            return Max31855()
+        elif config.max31856:
+            return Max31856()
+        else:
+            raise ThermocoupleError("not connected")
+
+class ThermocoupleSimulated(Thermocouple):
     '''Simulates a temperature sensor '''
     def __init__(self):
-        TempSensor.__init__(self)
+        Thermocouple.__init__(self)
         self.simulated_temperature = config.sim_t_env
     def temperature(self):
         return self.simulated_temperature
 
-class TempSensorReal(TempSensor):
+class ThermocoupleReal(Thermocouple):
     '''real temperature sensor that takes many measurements
        during the time_step
        inputs
            config.temperature_average_samples 
     '''
     def __init__(self):
-        TempSensor.__init__(self)
+        Thermocouple.__init__(self)
         self.sleeptime = self.time_step / float(config.temperature_average_samples)
         self.temptracker = TempTracker() 
         self.spi_setup()
@@ -170,10 +181,10 @@ class ThermocoupleError(Exception):
         except KeyError:
             self.message = "unknown"
 
-class Max31855(TempSensorReal):
+class Max31855(ThermocoupleReal):
     '''each subclass expected to handle errors and get temperature'''
     def __init__(self):
-        TempSensorReal.__init__(self)
+        ThermocoupleReal.__init__(self)
         log.info("thermocouple MAX31855")
         import adafruit_max31855
         self.thermocouple = adafruit_max31855.MAX31855(self.spi, self.cs)
@@ -201,10 +212,10 @@ class Max31855_Error(ThermocoupleError):
             }
         super().__init__(message)
 
-class Max31856(TempSensorReal):
+class Max31856(ThermocoupleReal):
     '''each subclass expected to handle errors and get temperature'''
     def __init__(self):
-        TempSensorReal.__init__(self)
+        ThermocoupleReal.__init__(self)
         log.info("thermocouple MAX31856")
         import adafruit_max31856
         self.thermocouple = adafruit_max31856.MAX31856(self.spi,self.cs,

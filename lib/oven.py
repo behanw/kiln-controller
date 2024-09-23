@@ -11,7 +11,7 @@ import adafruit_bitbangio as bitbangio
 import statistics
 
 from firing_profile import Firing_Profile
-from thermocouple import TempSensorSimulated, Max31855, Max31856
+from thermocouple import Thermocouple
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +64,8 @@ class Board(object):
     '''
     def __init__(self):
         log.info("board: %s" % (self.name))
-        self.temp_sensor.start()
+        self.thermocouple = Thermocouple.get()
+        self.thermocouple.start()
 
 class RealBoard(Board):
     '''Each board has a thermocouple board attached to it.
@@ -74,18 +75,11 @@ class RealBoard(Board):
     def __init__(self):
         self.name = None
         self.load_libs()
-        self.temp_sensor = self.choose_tempsensor()
         Board.__init__(self) 
 
     def load_libs(self):
         import board
         self.name = board.board_id
-
-    def choose_tempsensor(self):
-        if config.max31855:
-            return Max31855()
-        if config.max31856:
-            return Max31856()
 
 class SimulatedBoard(Board):
     '''Simulated board used during simulations.
@@ -93,7 +87,6 @@ class SimulatedBoard(Board):
     '''
     def __init__(self):
         self.name = "simulated"
-        self.temp_sensor = TempSensorSimulated()
         Board.__init__(self) 
 
 class Oven(threading.Thread):
@@ -163,7 +156,7 @@ class Oven(threading.Thread):
         if allow_seek:
             if self.state == 'IDLE':
                 if config.seek_start:
-                    temp = self.board.temp_sensor.temperature()  # Defined in a subclass
+                    temp = self.board.thermocouple.temperature()  # Defined in a subclass
                     runtime += self.get_start_from_temperature(profile, temp)
 
         self.reset()
@@ -187,7 +180,7 @@ class Oven(threading.Thread):
         '''shift the whole schedule forward in time by one time_step
         to wait for the kiln to catch up'''
         if config.kiln_must_catch_up == True:
-            temp = self.board.temp_sensor.temperature() + \
+            temp = self.board.thermocouple.temperature() + \
                 config.thermocouple_offset
             # kiln too cold, wait for it to heat up
             if self.target - temp > config.pid_control_window:
@@ -216,13 +209,13 @@ class Oven(threading.Thread):
 
     def reset_if_emergency(self):
         '''reset if the temperature is way TOO HOT, or other critical errors detected'''
-        if (self.board.temp_sensor.temperature() + config.thermocouple_offset >=
+        if (self.board.thermocouple.temperature() + config.thermocouple_offset >=
             config.emergency_shutoff_temp):
             log.info("emergency!!! temperature too high")
             if config.ignore_temp_too_high == False:
                 self.abort_run()
         
-        if self.board.temp_sensor.status.over_error_limit():
+        if self.board.thermocouple.status.over_error_limit():
             log.info("emergency!!! too many errors in a short period")
             if config.ignore_tc_too_many_errors == False:
                 self.abort_run()
@@ -243,7 +236,7 @@ class Oven(threading.Thread):
     def get_state(self):
         temp = 0
         try:
-            temp = self.board.temp_sensor.temperature() + config.thermocouple_offset
+            temp = self.board.thermocouple.temperature() + config.thermocouple_offset
         except AttributeError as error:
             # this happens at start-up with a simulated oven
             temp = 0
@@ -410,12 +403,12 @@ class SimulatedOven(Oven):
         self.p_env = (self.t - self.t_env) / self.R_o_nocool
         self.t -= self.p_env * self.time_step / self.c_oven
         self.temperature = self.t
-        self.board.temp_sensor.simulated_temperature = self.t
+        self.board.thermocouple.simulated_temperature = self.t
 
     def heat_then_cool(self):
         now_simulator = self.start_time + datetime.timedelta(milliseconds = self.runtime * 1000)
         pid = self.pid.compute(self.target,
-                               self.board.temp_sensor.temperature() +
+                               self.board.thermocouple.temperature() +
                                config.thermocouple_offset, now_simulator)
 
         heat_on = float(self.time_step * pid)
@@ -478,7 +471,7 @@ class RealOven(Oven):
 
     def heat_then_cool(self):
         pid = self.pid.compute(self.target,
-                               self.board.temp_sensor.temperature() +
+                               self.board.thermocouple.temperature() +
                                config.thermocouple_offset, datetime.datetime.now())
 
         heat_on = float(self.time_step * pid)
