@@ -24,7 +24,7 @@ log.info("Starting kiln controller")
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
 
-from profile import Profile
+from firing_profile import Firing_Profile
 from oven import Oven
 from ovenWatcher import OvenWatcher
 
@@ -74,35 +74,34 @@ def handle_api():
 
         # get the wanted profile/kiln schedule
         try:
-            profile = Profile.load(wanted)
+            profile = Firing_Profile.load(wanted)
         except FileNotFoundError:
             return { "success" : False, "error" : "profile {} not found".format(wanted) }
         except e:
             raise(e)
 
-        # FIXME juggling of json should happen in the Profile class
         oven.run_profile(profile, startat=startat, allow_seek=allow_seek)
         ovenWatcher.record(profile)
 
-    if bottle.request.json['cmd'] == 'pause':
+    elif bottle.request.json['cmd'] == 'pause':
         log.info("api pause command received")
         oven.state = 'PAUSED'
 
-    if bottle.request.json['cmd'] == 'resume':
+    elif bottle.request.json['cmd'] == 'resume':
         log.info("api resume command received")
         oven.state = 'RUNNING'
 
-    if bottle.request.json['cmd'] == 'stop':
+    elif bottle.request.json['cmd'] == 'stop':
         log.info("api stop command received")
         oven.abort_run()
 
-    if bottle.request.json['cmd'] == 'memo':
+    elif bottle.request.json['cmd'] == 'memo':
         log.info("api memo command received")
         memo = bottle.request.json['memo']
         log.info("memo=%s" % (memo))
 
     # get stats during a run
-    if bottle.request.json['cmd'] == 'stats':
+    elif bottle.request.json['cmd'] == 'stats':
         log.info("api stats command received")
         if hasattr(oven,'pid'):
             if hasattr(oven.pid,'pidstats'):
@@ -138,14 +137,14 @@ def handle_control():
                     log.info("RUN command received")
                     profile_obj = msgdict.get('profile')
                     if profile_obj:
-                        profile = Profile(profile_obj)
+                        profile = Firing_Profile(profile_obj)
                     oven.run_profile(profile)
                     ovenWatcher.record(profile)
                 elif msgdict.get("cmd") == "SIMULATE":
                     log.info("SIMULATE command received")
                     #profile_obj = msgdict.get('profile')
                     #if profile_obj:
-                    #    profile = Profile(profile_obj)
+                    #    profile = Firing_Profile(profile_obj)
                     #simulated_oven = Oven(simulate=True, time_step=0.05)
                     #simulation_watcher = OvenWatcher(simulated_oven)
                     #simulation_watcher.add_observer(wsock)
@@ -179,27 +178,27 @@ def handle_storage():
 
             if message == "GET":
                 log.info("GET command received")
-                wsock.send(Profile.get_all_json())
+                wsock.send(Firing_Profile.get_all_json())
             elif msgdict.get("cmd") == "DELETE":
                 log.info("DELETE command received")
                 profile_obj = msgdict.get('profile')
-                if Profile.delete(profile_obj):
+                if Firing_Profile.delete(profile_obj):
                   msgdict["resp"] = "OK"
                 wsock.send(json.dumps(msgdict))
-                #wsock.send(Profile.get_all_json())
+                #wsock.send(Firing_Profile.get_all_json())
             elif msgdict.get("cmd") == "PUT":
                 log.info("PUT command received")
                 profile_obj = msgdict.get('profile')
                 if profile_obj:
                     #del msgdict["cmd"]
-                    if Profile.save(profile_obj):
+                    if Firing_Profile.save(profile_obj):
                         msgdict["resp"] = "OK"
                     else:
                         msgdict["resp"] = "FAIL"
                     log.debug("websocket (storage) sent: %s" % message)
 
                     wsock.send(json.dumps(msgdict))
-                    wsock.send(Profile.get_all_json())
+                    wsock.send(Firing_Profile.get_all_json())
             time.sleep(1) 
         except WebSocketError:
             break

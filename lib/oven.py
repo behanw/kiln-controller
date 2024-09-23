@@ -10,7 +10,7 @@ import busio
 import adafruit_bitbangio as bitbangio
 import statistics
 
-from profile import Profile
+from firing_profile import Firing_Profile
 
 log = logging.getLogger(__name__)
 
@@ -544,7 +544,7 @@ class Oven(threading.Thread):
         log.info("automatically restarting profile = %s at minute = %d" % (profile_path,startat))
         with open(profile_path) as infile:
             profile_obj = json.load(infile)
-        profile = Profile(profile_obj)
+        profile = Firing_Profile(profile_obj)
         self.run_profile(profile, startat=startat, allow_seek=False)  # We don't want a seek on an auto restart.
         self.cost = d["cost"]
         time.sleep(1)

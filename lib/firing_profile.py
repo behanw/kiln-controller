@@ -7,8 +7,6 @@ import logging
 logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 
-profile_path = config.kiln_profiles_directory
-
 def convert_temp(temp, converto):
     if converto == 'c':
         temp = round((temp - 32) * 5 / 9)
@@ -44,27 +42,29 @@ def add_temp_units(profile):
 def get_filename(name):
     if not name.endswith(".json"):
         name += ".json"
-    return os.path.join(profile_path, name)
+    return os.path.join(config.kiln_profile_directory, name)
 
 def read_profile(name):
     with open(get_filename(name), 'r') as f:
         return(convert_to_temp_scale(json.load(f)))
 
 def read_all():
-    return [ read_profile(name) for name in os.listdir(profile_path) ]
+    return [ read_profile(name) for name in os.listdir(config.kiln_profile_directory) if name.endswith(".json") ]
 
-class Profile():
+class Firing_Profile():
+    """The Firing_Profile Class"""
     def __init__(self, obj):
         self.name = obj["name"]
         self.data = sorted(obj["data"])
-
-    @staticmethod
-    def load(name):
-        return Profile(read_profile(name))
+        self.unit = obj["temp_units"]
 
     @staticmethod
     def get_all_json():
         return json.dumps(read_all())
+
+    @staticmethod
+    def load(name):
+        return Firing_Profile(read_profile(name))
 
     @staticmethod
     def save(profile, force=True):
@@ -110,17 +110,15 @@ class Profile():
         return time
 
     def get_surrounding_points(self, time):
-        if time > self.get_duration():
-            return (None, None)
-
         prev_point = None
         next_point = None
 
-        for i in range(len(self.data)):
-            if time < self.data[i][0]:
-                prev_point = self.data[i-1]
-                next_point = self.data[i]
-                break
+        if time <= self.get_duration():
+            for i in range(len(self.data)):
+                if time < self.data[i][0]:
+                    prev_point = self.data[i-1]
+                    next_point = self.data[i]
+                    break
 
         return (prev_point, next_point)
 
