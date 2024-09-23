@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from lib.firing_profile import Firing_Profile
 import config
-config.kiln_profile_directory = os.path.abspath(os.path.dirname(__file__))
+config.kiln_profiles_directory = os.path.abspath(os.path.dirname(__file__))
 
 def get_profile(file = "test-fast", unit = "c"):
     config.temp_scale = unit
