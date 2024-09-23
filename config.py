@@ -10,7 +10,16 @@ log_level = logging.INFO
 log_format = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 
 ### Server
+incoming_ip = "0.0.0.0"
 listening_port = 8081
+
+## TLS support
+use_tls = False
+if use_tls:
+    listening_port = 443
+    hostname = "fqdn.hostname.net"
+    https_certfile = "/path/to/ssl.crt"
+    https_keyfile = "/path/to/ssl.key"
 
 ########################################################################
 # Cost Information
