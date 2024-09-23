@@ -1,7 +1,5 @@
 import logging
 import os
-from digitalio import DigitalInOut
-import busio
 
 ########################################################################
 #
@@ -83,6 +81,8 @@ currency_type   = "$"   # Currency Symbol to show when calculating cost to run j
 # I use GPIO pin 23.
 
 try:
+    from digitalio import DigitalInOut
+    import busio
     import board
     spi_sclk  = board.D17    #spi clock
     spi_miso  = board.D27    #spi Microcomputer In Serial Out
@@ -90,8 +90,9 @@ try:
     spi_mosi  = board.D10    #spi Microcomputer Out Serial In (not connected) 
     gpio_heat = board.D23    #output that controls relay
     gpio_heat_invert = False #invert the output state
-except (NotImplementedError,AttributeError):
+except (ImportError,NotImplementedError,AttributeError):
     print("not running on blinka recognized board, probably a simulation")
+    simulate = True
 
 #######################################
 ### Thermocouple breakout boards
