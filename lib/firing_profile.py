@@ -42,14 +42,14 @@ def add_temp_units(profile):
 def get_filename(name):
     if not name.endswith(".json"):
         name += ".json"
-    return os.path.join(config.kiln_profile_directory, name)
+    return os.path.join(config.kiln_profiles_directory, name)
 
 def read_profile(name):
     with open(get_filename(name), 'r') as f:
         return(convert_to_temp_scale(json.load(f)))
 
 def read_all():
-    return [ read_profile(name) for name in os.listdir(config.kiln_profile_directory) if name.endswith(".json") ]
+    return [ read_profile(name) for name in os.listdir(config.kiln_profiles_directory) if name.endswith(".json") ]
 
 class Firing_Profile():
     """The Firing_Profile Class"""
