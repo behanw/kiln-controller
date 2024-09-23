@@ -101,19 +101,19 @@ except (NotImplementedError,AttributeError):
 #   max31856 - supports many thermocouples
 max31855 = 1
 max31856 = 0
-# uncomment these two lines if using MAX-31856
-import adafruit_max31856
-thermocouple_type = adafruit_max31856.ThermocoupleType.K
 
-# here are the possible max-31856 thermocouple types
-#   ThermocoupleType.B
-#   ThermocoupleType.E
-#   ThermocoupleType.J
-#   ThermocoupleType.K
-#   ThermocoupleType.N
-#   ThermocoupleType.R
-#   ThermocoupleType.S
-#   ThermocoupleType.T
+if max31856:
+    import adafruit_max31856
+    # here are the possible max-31856 thermocouple types
+    #   ThermocoupleType.B
+    #   ThermocoupleType.E
+    #   ThermocoupleType.J
+    #   ThermocoupleType.K
+    #   ThermocoupleType.N
+    #   ThermocoupleType.R
+    #   ThermocoupleType.S
+    #   ThermocoupleType.T
+    thermocouple_type = adafruit_max31856.ThermocoupleType.K
 
 ########################################################################
 #
