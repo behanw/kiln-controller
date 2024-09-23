@@ -40,6 +40,13 @@ class Board(object):
         self.thermocouple = Thermocouple.get()
         self.thermocouple.start()
 
+    @staticmethod
+    def get():
+        if config.simulate == True:
+            return SimulatedBoard()
+        else:
+            return RealBoard()
+
 class RealBoard(Board):
     '''Each board has a thermocouple board attached to it.
     Any blinka board that supports SPI can be used. The
@@ -48,6 +55,7 @@ class RealBoard(Board):
     def __init__(self):
         self.name = None
         self.load_libs()
+        self.output = Output()
         Board.__init__(self) 
 
     def load_libs(self):

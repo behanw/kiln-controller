@@ -7,7 +7,7 @@ import config
 import os
 
 from firing_profile import Firing_Profile
-from board import RealBoard, SimulatedBoard, Output
+from board import Board
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class Oven(threading.Thread):
        for either a real or simulated oven'''
     def __init__(self):
         threading.Thread.__init__(self)
+        self.board = Board.get()
         self.daemon = True
         self.temperature = 0
         self.time_step = config.sensor_time_wait
@@ -288,7 +289,6 @@ class Oven(threading.Thread):
 class SimulatedOven(Oven):
 
     def __init__(self):
-        self.board = SimulatedBoard()
         self.t_env = config.sim_t_env
         self.c_heat = config.sim_c_heat
         self.c_oven = config.sim_c_oven
@@ -396,10 +396,6 @@ class SimulatedOven(Oven):
 class RealOven(Oven):
 
     def __init__(self):
-        self.board = RealBoard()
-        self.output = Output()
-        self.reset()
-
         # call parent init
         Oven.__init__(self)
 
@@ -408,7 +404,7 @@ class RealOven(Oven):
 
     def reset(self):
         super().reset()
-        self.output.cool(0)
+        self.board.output.cool(0)
 
     def heat_then_cool(self):
         pid = self.pid.compute(self.target,
@@ -424,9 +420,9 @@ class RealOven(Oven):
             self.heat = 1.0
 
         if heat_on:
-            self.output.heat(heat_on)
+            self.board.output.heat(heat_on)
         if heat_off:
-            self.output.cool(heat_off)
+            self.board.output.cool(heat_off)
         time_left = self.totaltime - self.runtime
         try:
             log.info("temp=%.2f, target=%.2f, error=%.2f, pid=%.2f, p=%.2f, i=%.2f, d=%.2f, heat_on=%.2f, heat_off=%.2f, run_time=%d, total_time=%d, time_left=%d" %
