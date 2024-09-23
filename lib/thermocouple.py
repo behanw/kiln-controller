@@ -1,11 +1,8 @@
 import threading
 import time
-#import datetime
 import logging
 import config
-#import os
 import digitalio
-#import busio
 import adafruit_bitbangio as bitbangio
 import statistics
 
