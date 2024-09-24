@@ -46,9 +46,7 @@ def state():
 @app.get('/api/stats')
 def handle_api():
     log.info("/api/stats command received")
-    if hasattr(oven,'pid'):
-        if hasattr(oven.pid,'pidstats'):
-            return json.dumps(oven.pid.pidstats)
+    return oven.pidstats()
 
 
 @app.post('/api')
@@ -85,11 +83,11 @@ def handle_api():
 
     elif bottle.request.json['cmd'] == 'pause':
         log.info("api pause command received")
-        oven.state = 'PAUSED'
+        oven.pause()
 
     elif bottle.request.json['cmd'] == 'resume':
         log.info("api resume command received")
-        oven.state = 'RUNNING'
+        oven.resume()
 
     elif bottle.request.json['cmd'] == 'stop':
         log.info("api stop command received")
@@ -103,9 +101,7 @@ def handle_api():
     # get stats during a run
     elif bottle.request.json['cmd'] == 'stats':
         log.info("api stats command received")
-        if hasattr(oven,'pid'):
-            if hasattr(oven.pid,'pidstats'):
-                return json.dumps(oven.pid.pidstats)
+        return oven.pidstats()
 
     return { "success" : True }
 

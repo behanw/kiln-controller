@@ -43,7 +43,7 @@ class Oven(threading.Thread):
 
     def reset(self):
         self.cost = 0
-        self.state = "IDLE"
+        self.idle()
         self.profile = None
         self.start_time = 0
         self.runtime = 0
@@ -54,6 +54,22 @@ class Oven(threading.Thread):
         self.heat_rate_temps = []
         self.pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
         self.catching_up = False
+
+    def idle(self):
+        self.state = "IDLE"
+    def idling(self):
+        return self.state == "IDLE"
+    def pause(self):
+        self.state = "PAUSED"
+    def paused(self):
+        return self.state == "PAUSED"
+    def resume(self):
+        self.state = "RUNNING"
+    def running(self):
+        return self.state == "RUNNING"
+    def pidstats(self):
+        if hasattr(self, 'pid') and hasattr(self.pid, 'pidstats'):
+            return json.dumps(self.pid.pidstats)
 
     @staticmethod
     def getOven():
@@ -96,7 +112,7 @@ class Oven(threading.Thread):
         log.debug('run_profile run on thread' + threading.current_thread().name)
         runtime = startat * 60
         if allow_seek:
-            if self.state == 'IDLE':
+            if self.idling():
                 if config.seek_start:
                     temp = self.board.thermocouple.temperature()  # Defined in a subclass
                     runtime += self.get_start_from_temperature(profile, temp)
@@ -107,7 +123,7 @@ class Oven(threading.Thread):
         self.start_time = datetime.datetime.now() - datetime.timedelta(seconds=self.startat)
         self.profile = profile
         self.totaltime = profile.get_duration()
-        self.state = "RUNNING"
+        self.resume()
         log.info("Running schedule %s starting at %d minutes" % (profile.name,startat))
         log.info("Starting")
 
@@ -263,20 +279,18 @@ class Oven(threading.Thread):
     def run(self):
         while True:
             log.debug('Oven running on ' + threading.current_thread().name)
-            if self.state == "IDLE":
+            if self.idling():
                 if self.should_i_automatic_restart() == True:
                     self.automatic_restart()
                 time.sleep(1)
-                continue
-            if self.state == "PAUSED":
+            elif self.paused():
                 self.start_time = self.get_start_time()
                 self.update_runtime()
                 self.update_target_temp()
                 self.heat_then_cool()
                 self.reset_if_emergency()
                 self.reset_if_schedule_ended()
-                continue
-            if self.state == "RUNNING":
+            elif self.running():
                 self.update_cost()
                 self.save_automatic_restart_state()
                 self.kiln_must_catch_up()
