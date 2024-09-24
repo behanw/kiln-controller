@@ -145,14 +145,13 @@ class Oven(threading.Thread):
                 log.info("kiln must catch up, too cold, shifting schedule")
                 self.start_time = self.get_start_time()
                 self.catching_up = True;
-                return
             # kiln too hot, wait for it to cool down
-            if temp - self.target > config.pid_control_window:
+            elif temp - self.target > config.pid_control_window:
                 log.info("kiln must catch up, too hot, shifting schedule")
                 self.start_time = self.get_start_time()
                 self.catching_up = True;
-                return
-            self.catching_up = False;
+            else:
+                self.catching_up = False;
 
     def update_runtime(self):
 
