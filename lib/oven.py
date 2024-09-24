@@ -9,6 +9,8 @@ import os
 from firing_profile import Firing_Profile
 from board import Board
 
+import pluggy
+
 log = logging.getLogger(__name__)
 
 class DupFilter(object):
@@ -33,9 +35,10 @@ duplog = Duplogger().logref()
 class Oven(threading.Thread):
     '''parent oven class. this has all the common code
        for either a real or simulated oven'''
-    def __init__(self):
+    def __init__(self, hook):
+        self.hook = hook
         threading.Thread.__init__(self)
-        self.board = Board.get()
+        self.board = Board.get(hook)
         self.daemon = True
         self.temperature = 0
         self.time_step = config.sensor_time_wait
@@ -72,13 +75,13 @@ class Oven(threading.Thread):
             return json.dumps(self.pid.pidstats)
 
     @staticmethod
-    def getOven():
+    def getOven(hook):
         if config.simulate == True:
             log.info("this is a simulation")
-            return SimulatedOven()
+            return SimulatedOven(hook)
         else:
             log.info("this is a real kiln")
-            return RealOven()
+            return RealOven(hook)
 
     @staticmethod
     def get_start_from_temperature(profile, temp):
@@ -278,6 +281,7 @@ class Oven(threading.Thread):
     def run(self):
         while True:
             log.debug('Oven running on ' + threading.current_thread().name)
+            self.hook.activity()
             if self.idling():
                 if self.should_i_automatic_restart() == True:
                     self.automatic_restart()
@@ -301,7 +305,7 @@ class Oven(threading.Thread):
 
 class SimulatedOven(Oven):
 
-    def __init__(self):
+    def __init__(self, hook):
         self.t_env = config.sim_t_env
         self.c_heat = config.sim_c_heat
         self.c_oven = config.sim_c_oven
@@ -315,7 +319,7 @@ class SimulatedOven(Oven):
         self.t = config.sim_t_env  # deg C or F temp of oven
         self.t_h = self.t_env #deg C temp of heating element
 
-        super().__init__()
+        super().__init__(hook)
 
         self.start_time = self.get_start_time();
 
@@ -408,9 +412,9 @@ class SimulatedOven(Oven):
 
 class RealOven(Oven):
 
-    def __init__(self):
+    def __init__(self, hook):
         # call parent init
-        Oven.__init__(self)
+        Oven.__init__(self, hook)
 
         # start thread
         self.start()

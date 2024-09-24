@@ -17,6 +17,12 @@ from geventwebsocket import WebSocketError
 # try/except removed here on purpose so folks can see why things break
 import config
 
+import pluggy
+pm = pluggy.PluginManager("kilnctrl")
+from plugins import hookspecs
+pm.add_hookspecs(hookspecs)
+pm.load_setuptools_entrypoints("kilnctrl")
+
 logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
@@ -30,7 +36,7 @@ from ovenWatcher import OvenWatcher
 
 app = bottle.Bottle()
 
-oven = Oven.getOven()
+oven = Oven.getOven(pm.hook)
 ovenWatcher = OvenWatcher(oven)
 # this ovenwatcher is used in the oven class for restarts
 oven.set_ovenwatcher(ovenWatcher)
