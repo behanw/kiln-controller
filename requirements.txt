@@ -24,3 +24,6 @@ adafruit-circuitpython-bitbangio
 
 # untested - for mcp9600 and mcp9601
 #adafruit-circuitpython-mcp9600
+
+# for DS18B20 chassis temperature sensor
+adafruit-circuitpython-ds18x20

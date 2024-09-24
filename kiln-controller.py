@@ -27,6 +27,18 @@ logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
 
+from plugins.ambient_temp import AmbientTemp
+pm.register(AmbientTemp())
+
+from plugins.caution import Caution
+pm.register(Caution())
+
+from plugins.estop import Estop
+pm.register(Estop())
+
+from plugins.heartbeat import Heartbeat
+pm.register(Heartbeat())
+
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
 

@@ -99,6 +99,14 @@ try:
     spi_mosi  = board.D10    #spi Microcomputer Out Serial In (not connected)
     gpio_heat = board.D23    #output that controls relay
     gpio_heat_invert = False #invert the output state
+
+    ambient_temp_gpio  = board.D4 # 1-wire bus for chassis temp
+    estop_button_gpio  = board.D24
+    #estop_button_invert = False
+    estop_led_gpio     = board.D27
+    #estop_led_invert = False
+    heartbeat_gpio     = board.D22
+    #heartbeat_invert  = False
 except (ImportError,NotImplementedError,AttributeError):
     print("not running on blinka recognized board, probably a simulation")
     simulate = True
