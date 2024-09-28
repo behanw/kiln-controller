@@ -1,25 +1,22 @@
-import threading
-import time
 import logging
 import config
+import time
 import digitalio
 
 log = logging.getLogger(__name__)
 
-import plugins
+from plugins.kilnplugin import KilnPlugin
 
-class Estop(threading.Thread):
-    '''This represents a GPIO output that controls a
-    status LED which beats like a heart.
-        config.estop_button_gpio
-        config.estop_button_invert
-        config.estop_led_gpio
-        config.estop_led_invert
+class Estop(KilnPlugin):
+    '''This reads the state of the estop button.
+    Although the estop directly controls power to the kiln,
+    this GPIO allows us to know if it's been pushed or not.
+        config.estop_gpio
+        config.estop_invert
         config.estop_quiet
     '''
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.daemon = True
+    def __init__(self, hook=None):
+        super().__init__(hook)
 
         # Read Estop Button GPIO
         try:
@@ -31,26 +28,10 @@ class Estop(threading.Thread):
 
         # Read Estop Button active-high or active-low
         try:
-            self.button_off = config.estop_button_invert
+            self.unpressed = config.estop_invert
         except:
-            self.button_off = False
-        self.button_on = not self.button_off
-
-        # Read Estop LED GPIO
-        try:
-            self.led = digitalio.DigitalInOut(config.estop_led_gpio)
-            self.led.direction = digitalio.Direction.OUTPUT 
-            self.simulated = False
-        except:
-            self.simulated = True
-
-        # Read Estop active-high or active-low
-        try:
-            self.off = config.estop_led_invert
-        except:
-            self.led_off = False
-        self.led_on = not self.led_off
-        self.turnled(self.led_off)
+            self.unpressed = False
+        self.pressed = not self.unpressed
 
         # Quiet Estop during simulation for debugging
         try:
@@ -60,23 +41,30 @@ class Estop(threading.Thread):
         if self.simulated and self.quiet:
             log.warn("Estop disabled during simulation")
 
-        self.period = 1
-
-        self.start()
-
-    def turnled(self, state, delay=0, msg=None):
-        if not self.simulated:
-            self.led.value = state
-        elif msg != None and self.quiet == False:
-            log.info(msg)
-        time.sleep(delay)
-
     # This method will be executed when the thread starts
     def run(self):
-        log.info("Starting E-stop monitor")
+        log.info(self.message("Starting E-stop monitor"))
 
         while True:
-            if not self.simulated and self.button.value == self.button_on:
-                self.turnled(self.led_on, self.period, "E-stop engaged")
-            else:
-                self.turnled(self.led_off, self.period)
+            if self.hook:
+                if not self.simulated and self.button.value == self.pressed:
+                    #log.warn("button pressed")
+                    self.hook.failure(info={
+                        "reason": "E-stop engaged",
+                        "pattern": "fail"
+                        })
+                else:
+                    self.hook.clear_failure(info={
+                        "reason": "E-stop released",
+                        "pattern": "off"
+                        })
+            time.sleep(self.period)
+
+estopObj = None
+
+def startPlugin(hook=None):
+    global estopObj
+    estopObj = Estop(hook)
+    estopObj.start()
+    return estopObj
+
