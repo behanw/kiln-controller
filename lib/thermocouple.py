@@ -2,36 +2,17 @@ import threading
 import time
 import logging
 import config
-import statistics
+
+from lib.averagetemp import AverageTemp
 
 log = logging.getLogger(__name__)
 
-class TempTracker(object):
-    '''creates a sliding window of N temperatures per
-       config.sensor_time_wait
-    '''
-    def __init__(self):
-        self.size = config.temperature_average_samples
-        self.temps = [0 for i in range(self.size)]
-  
-    def add(self,temp):
-        self.temps.append(temp)
-        while(len(self.temps) > self.size):
-            del self.temps[0]
-
-    def get_avg_temp(self, chop=25):
-        '''
-        take the median of the given values. this used to take an avg
-        after getting rid of outliers. median works better.
-        '''
-        return statistics.median(self.temps)
-
-class ThermocoupleTracker(object):
+class ThermocoupleStatus(object):
     '''Keeps sliding window to track successful/failed calls to get temp
        over the last two duty cycles.
     '''
     def __init__(self):
-        self.size = config.temperature_average_samples * 2 
+        self.size = config.temperature_average_samples * 2
         self.status = [True for i in range(self.size)]
         self.limit = 30
 
@@ -46,7 +27,7 @@ class ThermocoupleTracker(object):
         del self.status[0]
 
     def error_percent(self):
-        errors = sum(i == False for i in self.status) 
+        errors = sum(i == False for i in self.status)
         return (errors/self.size)*100
 
     def over_error_limit(self):
@@ -62,7 +43,7 @@ class Thermocouple(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = True
         self.time_step = config.sensor_time_wait
-        self.status = ThermocoupleTracker()
+        self.status = ThermocoupleStatus()
 
     @staticmethod
     def get():
@@ -87,12 +68,12 @@ class ThermocoupleReal(Thermocouple):
     '''real temperature sensor that takes many measurements
        during the time_step
        inputs
-           config.temperature_average_samples 
+           config.temperature_average_samples
     '''
     def __init__(self):
         Thermocouple.__init__(self)
         self.sleeptime = self.time_step / float(config.temperature_average_samples)
-        self.temptracker = TempTracker() 
+        self.averagetemp = AverageTemp()
 
         self.spi_setup()
 
@@ -130,13 +111,13 @@ class ThermocoupleReal(Thermocouple):
 
     def temperature(self):
         '''average temp over a duty cycle'''
-        return self.temptracker.get_avg_temp()
+        return self.averagetemp.get_temp()
 
     def run(self):
         while True:
             temp = self.get_temperature()
             if temp:
-                self.temptracker.add(temp)
+                self.averagetemp.add(temp)
             time.sleep(self.sleeptime)
 
 class ThermocoupleError(Exception):
@@ -226,7 +207,7 @@ class Max31856(ThermocoupleReal):
 
     def raw_temp(self):
         # The underlying adafruit library does not throw exceptions
-        # for thermocouple errors. Instead, they are stored in 
+        # for thermocouple errors. Instead, they are stored in
         # dict named self.thermocouple.fault. Here we check that
         # dict for errors and raise an exception.
         # and raise Max31856_Error(message)
@@ -246,7 +227,7 @@ class Max31856_Error(ThermocoupleError):
             "cj_low"   : "cold junction temp too low",
             "tc_high"  : "thermocouple temp too high",
             "tc_low"   : "thermocouple temp too low",
-            "voltage"  : "voltage too high or low", 
+            "voltage"  : "voltage too high or low",
             "open_tc"  : "not connected"
             }
         super().__init__(message)
