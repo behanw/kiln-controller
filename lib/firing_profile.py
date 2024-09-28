@@ -56,7 +56,10 @@ class Firing_Profile():
     def __init__(self, obj):
         self.name = obj["name"]
         self.data = sorted(obj["data"])
-        self.unit = obj["temp_units"]
+        try:
+            self.unit = obj["temp_units"]
+        except:
+            self.unit = "f"
 
     @staticmethod
     def get_all_json():
