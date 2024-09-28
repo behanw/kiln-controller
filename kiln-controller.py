@@ -17,27 +17,12 @@ from geventwebsocket import WebSocketError
 # try/except removed here on purpose so folks can see why things break
 import config
 
-import pluggy
-pm = pluggy.PluginManager("kilnctrl")
-from plugins import hookspecs
-pm.add_hookspecs(hookspecs)
-pm.load_setuptools_entrypoints("kilnctrl")
-
 logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
 
-from plugins.ambient_temp import AmbientTemp
-pm.register(AmbientTemp())
-
-from plugins.caution import Caution
-pm.register(Caution())
-
-from plugins.estop import Estop
-pm.register(Estop())
-
-from plugins.heartbeat import Heartbeat
-pm.register(Heartbeat())
+from plugins.load import get_pluginmanager
+pm = get_pluginmanager()
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
