@@ -192,6 +192,7 @@ if __name__ == "__main__":
     target = args.target_temp
     if config.temp_scale.lower() == "c":
         target = (target - 32)*5/9
+    print("Target temp is {}".format(target))
     tangentdivisor = args.tangent_divisor 
 
     # default behavior is to record profile to csv file tuning.csv
