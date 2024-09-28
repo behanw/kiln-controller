@@ -22,10 +22,10 @@ After, you're done with the tuning process, just reboot and the kiln-controller 
 
 run the auto-tuner:
 ```
-source venv/bin/activate; ./kiln-tuner.py
+source venv/bin/activate; ./scripts/kiln-tuner.py
 ```
 
-The kiln-tuner will heat your kiln to 400F. Next it will start cooling. Once the temperature goes back to 400F, the PID values are calculated and the program ends. The output will look like this:
+The scripts/kiln-tuner will heat your kiln to 400F. Next it will start cooling. Once the temperature goes back to 400F, the PID values are calculated and the program ends. The output will look like this:
 
 ```
 stage = cooling, actual = 401.51, target = 400.00
@@ -54,7 +54,7 @@ The Ziegler Nicols estimate requires that your graph look similar to this: [kiln
 You might need to adjust the line parameters to make it fit your data properly. You'll do this using previously saved data without the need to heat & cool again. 
 
 ```
-source venv/bin/activate;./kiln-tuner.py -c -s -d 4
+source venv/bin/activate;./scripts/kiln-tuner.py -c -s -d 4
 ```
 
 | Parameter | Description |
@@ -68,5 +68,5 @@ source venv/bin/activate;./kiln-tuner.py -c -s -d 4
 By default it is 400F. You can change this as follows:
 
 ```
-python kiln-tuner.py -t 500
+python scripts/kiln-tuner.py -t 500
 ```

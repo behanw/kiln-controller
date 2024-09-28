@@ -61,7 +61,7 @@ pip install -r ./requirements.txt
   5. test the thermocouple board and thermocouple
 
 ```
-  ./test-thermocouple.py
+  ./scripts/test-thermocouple.py
 ```
 
   You should see that **software spi** is configured. You should see the pin configuration printed out. You should see the temperature reported every second.
@@ -69,7 +69,7 @@ pip install -r ./requirements.txt
   4. test output
 
 ```
-  ./test-output.py
+  ./scripts/test-output.py
 ```
 
   Every 5 seconds, verify the output is flipped from on to off or vice versa.

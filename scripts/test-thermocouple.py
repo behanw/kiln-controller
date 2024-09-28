@@ -22,7 +22,7 @@ except NotImplementedError:
 #
 # then run this script...
 # 
-# ./test-thermocouple.py
+# ./scripts/test-thermocouple.py
 #
 # It will output a temperature in degrees every second. Touch your
 # thermocouple to heat it up and make sure the value changes. Accuracy

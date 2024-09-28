@@ -104,15 +104,15 @@ After you've completed connecting all the hardware together, there are scripts t
 
 then test the thermocouple with:
 
-     $ ./test-thermocouple.py
+     $ ./scripts/test-thermocouple.py
 
 then test the output with:
 
-     $ ./test-output.py
+     $ ./scripts/test-output.py
 
 and you can use this script to examine each pin's state including input/output/voltage on your board:
 
-     $ ./gpioreadall.py
+     $ ./scripts/gpioreadall.py
 
 ## PID Tuning
 
@@ -129,7 +129,7 @@ There is a state view that can help with tuning. It shows the P,I, and D paramet
 ### Autostart Server onBoot
 If you want the server to autostart on boot, run the following command:
 
-    $ /home/pi/kiln-controller/start-on-boot
+    $ /home/pi/kiln-controller/scripts/start-on-boot
 
 ### Client Access
 
@@ -146,7 +146,7 @@ If you want to schedule a kiln run to start in the future. Here are [examples](h
 
 ### Watcher
 
-If you're busy and do not want to sit around watching the web interface for problems, there is a watcher.py script which you can run on any machine in your local network or even on the raspberry pi which will watch the kiln-controller process to make sure it is running a schedule, and staying within a pre-defined temperature range. When things go bad, it sends messages to a slack channel you define. I have alerts set on my android phone for that specific slack channel. Here are detailed [instructions](https://github.com/jbruce12000/kiln-controller/blob/main/docs/watcher.md).
+If you're busy and do not want to sit around watching the web interface for problems, there is a scripts/watcher.py script which you can run on any machine in your local network or even on the raspberry pi which will watch the kiln-controller process to make sure it is running a schedule, and staying within a pre-defined temperature range. When things go bad, it sends messages to a slack channel you define. I have alerts set on my android phone for that specific slack channel. Here are detailed [instructions](https://github.com/jbruce12000/kiln-controller/blob/main/docs/watcher.md).
 
 ## License
 

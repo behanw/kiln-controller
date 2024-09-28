@@ -24,7 +24,7 @@ Logs from the app on the pi go to **/var/log/daemon.log** and look like this...
 If you need to send kiln logs to someone for troubleshooting:
 
 ```
-cd kiln-controller
+cd kiln-controller/scripts
 ./ziplogs
 ```
 
