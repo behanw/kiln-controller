@@ -20,7 +20,7 @@ except ImportError:
 def recordprofile(csvfile, targettemp):
 
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    sys.path.insert(0, script_dir + '/lib/')
+    sys.path.insert(0, script_dir + '/app/')
 
     from oven import Oven
 

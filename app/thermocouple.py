@@ -3,7 +3,7 @@ import time
 import logging
 import config
 
-from lib.averagetemp import AverageTemp
+from app.averagetemp import AverageTemp
 
 log = logging.getLogger(__name__)
 

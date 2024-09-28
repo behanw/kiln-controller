@@ -7,7 +7,7 @@ import config
 import os
 
 from firing_profile import Firing_Profile
-from lib.board import Board
+from app.board import Board
 
 import pluggy
 

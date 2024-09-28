@@ -6,7 +6,6 @@ import time
 
 log = logging.getLogger(__name__)
 
-#from lib.temptracker import TempTracker
 from plugins.kilnplugin import KilnPlugin
 
 class OneWire(object):

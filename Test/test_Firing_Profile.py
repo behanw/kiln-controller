@@ -5,7 +5,7 @@ import math
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from lib.firing_profile import Firing_Profile
+from app.firing_profile import Firing_Profile
 import config
 config.kiln_profiles_directory = os.path.abspath(os.path.dirname(__file__))
 

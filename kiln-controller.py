@@ -25,7 +25,7 @@ from plugins.load import get_pluginmanager
 pm = get_pluginmanager()
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.insert(0, script_dir + '/lib/')
+sys.path.insert(0, script_dir + '/app/')
 
 from firing_profile import Firing_Profile
 from oven import Oven
