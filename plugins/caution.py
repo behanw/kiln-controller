@@ -1,23 +1,29 @@
-import threading
-import time
 import logging
 import config
+import time
 import digitalio
 
 log = logging.getLogger(__name__)
 
 import plugins
+from plugins.kilnplugin import KilnPlugin
 
-class Caution(threading.Thread):
+Pattern = {
+    "off": [(0, 1)],
+    "fail": [(1, .25), (0, .25)]
+}
+
+class Caution(KilnPlugin):
     '''This represents a GPIO output that controls a
-    status LED which beats like a heart.
+    status LED which indicates caution or a failure.
         config.caution_gpio
         config.caution_invert
-        config.caution_quiet
+        config.caution_verbose
     '''
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.daemon = True
+    def __init__(self, hook=None):
+        super().__init__(hook)
+        self.fail = None
+        self.pattern = Pattern["off"]
 
         # Read Caution LED GPIO
         try:
@@ -29,7 +35,7 @@ class Caution(threading.Thread):
 
         # Read Caution LED active-high or active-low
         try:
-            self.off = config.caution_led_invert
+            self.off = config.caution_invert
         except:
             self.off = False
         self.on = not self.off
@@ -37,37 +43,59 @@ class Caution(threading.Thread):
 
         # Quiet Caution during simulation for debugging
         try:
-            self.quiet = config.caution_quiet
+            self.verbose = config.caution_verbose
         except:
-            self.quiet = False
-        if self.simulated and self.quiet:
+            self.verbose = False
+        if self.simulated and self.verbose:
             log.warn("Caution disabled during simulation")
 
-        self.period = 1
-        self.state = {}
+        self.clearfail()
 
-        self.start()
+    def setfail(self, info):
+        self.fail = info["reason"]
+        self.pattern = Pattern[info["pattern"] or "fail"]
 
-    def turnled(self, state, delay=0, msg=None):
-        if not self.simulated:
-            self.led.value = state
-        elif msg != None and self.quiet == False:
-            log.info(msg)
+    def clearfail(self):
+        self.fail = False
+        self.pattern = Pattern["off"]
+
+    def turnled(self, state, delay=1):
+        self.led.value = state
+        time.sleep(delay)
+
+    def play(self, pattern):
+        for (state, delay) in pattern:
+            if state:
+                self.led.value = self.on
+            else:
+                self.led.value = self.off
+            time.sleep(delay)
 
     # This method will be executed when the thread starts
     def run(self):
-        log.info("Starting CautionE-stop monitor")
+        log.info(self.message("Starting Caution light"))
 
         while True:
-            if self.state != {}:
-                self.turnled(self.on, "Caution")
-            else:
-                self.turnled(self.off)
-            time.sleep(self.period)
+            if self.fail:
+                if self.verbose:
+                    log.info(self.fail)
+            if not self.simulated:
+                self.play(self.pattern)
 
-    @plugins.hookimpl
-    def failure(self, reason):
-        self.state = reason
-        # Reset countdown
-        if hasattr(reason, 'msg'):
-            log.warn(reason['msg'])
+cautionObj = None
+
+def startPlugin(hook=None):
+    global cautionObj
+    cautionObj = Caution(hook)
+    cautionObj.start()
+    return cautionObj
+
+@plugins.hookimpl
+def failure(info):
+    if cautionObj != None:
+        cautionObj.setfail(info)
+
+@plugins.hookimpl
+def clear_failure(info):
+    if cautionObj != None:
+        cautionObj.clearfail()
