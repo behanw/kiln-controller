@@ -1,24 +1,29 @@
-import threading
-import time
 import logging
 import config
+import time
 import digitalio
 
 log = logging.getLogger(__name__)
 
 import plugins
+from plugins.kilnplugin import KilnPlugin
 
-class Heartbeat(threading.Thread):
+Pattern = {
+    "off": [(0, 1)],
+    "heartbeat": [(1, .1), (0, .1), (1, .1), (0, .7)],
+    "fail": [(1, .25), (0, .1)]
+}
+
+class Heartbeat(KilnPlugin):
     '''This represents a GPIO output that controls a
     status LED which beats like a heart.
         config.heartbeat_gpio
         config.heartbeat_invert
         config.heartbeat_period
-        config.heartbeat_quiet
+        config.heartbeat_verbose
     '''
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.daemon = True
+    def __init__(self, hook=None):
+        super().__init__(hook)
 
         # Read Heartbeat GPIO
         try:
@@ -34,51 +39,60 @@ class Heartbeat(threading.Thread):
         except:
             self.off = False
         self.on = not self.off
-        self.turnled(self.off)
 
         # Read Heartbeat period
         try:
             self.period = config.heartbeat_period
         except:
             self.period = 1
-        self.countdown = self.period
+        self.resetCountdown()
 
-        # Quiet Heartbeat during simulation for debugging
+        # Verbose Heartbeat during simulation for debugging
         try:
-            self.quiet = config.heartbeat_quiet
+            self.verbose = config.heartbeat_verbose
         except:
-            self.quiet = False
-        if self.simulated and self.quiet:
+            self.verbose = False
+        if self.simulated and self.verbose:
             log.warn("Heartbeat disabled during simulation")
 
-        self.start()
+    def play(self, pattern):
+        for (state, delay) in pattern:
+            if state:
+                self.led.value = self.on
+            else:
+                self.led.value = self.off
+            time.sleep(delay)
 
-    def turnled(self, state, delay=0, msg=None):
-        if not self.simulated:
-            self.led.value = state
-        elif msg != None and self.quiet == False:
+    def playpattern(self, pattern, msg):
+        if self.verbose:
             log.info(msg)
-        time.sleep(delay)
+        if not self.simulated:
+            self.play(pattern)
 
     # This method will be executed when the thread starts
     def run(self):
-        tenth = self.period * 0.1
-        seventieth = self.period * 0.7
-
-        log.info("Starting Heartbeat")
+        log.info(self.message("Starting Heartbeat"))
 
         while True:
             count = self.countdown
             if count > 0:
                 self.countdown = count - 1
-                self.turnled(self.on,  tenth, "Heartbeat")
-                self.turnled(self.off, tenth)
-                self.turnled(self.on,  tenth)
-                self.turnled(self.off, seventieth)
+                self.playpattern(Pattern["heartbeat"], "Heartbeat")
             else:
-                self.turnled(self.on, self.period * 2, "Failure")
+                self.playpattern(Pattern["fail"], "Fail")
 
-    @plugins.hookimpl
-    def activity(self):
-        # Reset countdown
+    def resetCountdown(self):
         self.countdown = self.period
+
+heartbeatObj = None
+
+def startPlugin(hook=None):
+    global heartbeatObj
+    heartbeatObj = Heartbeat(hook)
+    heartbeatObj.start()
+    return heartbeatObj
+
+@plugins.hookimpl
+def activity():
+    # Reset countdown
+    heartbeatObj.resetCountdown()
