@@ -5,8 +5,8 @@ import digitalio
 
 log = logging.getLogger(__name__)
 
-import plugins
-from plugins.kilnplugin import KilnPlugin
+import app.plugins
+from app.plugins.kilnplugin import KilnPlugin
 
 Pattern = {
     "off": [(0, 1)],
@@ -90,12 +90,12 @@ def startPlugin(hook=None):
     cautionObj.start()
     return cautionObj
 
-@plugins.hookimpl
+@app.plugins.hookimpl
 def failure(info):
     if cautionObj != None:
         cautionObj.setfail(info)
 
-@plugins.hookimpl
+@app.plugins.hookimpl
 def clear_failure(info):
     if cautionObj != None:
         cautionObj.clearfail()

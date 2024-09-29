@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
 def get_pluginmanager():
     pm = pluggy.PluginManager("kilnctrl")
-    from plugins import hookspecs
+    from app.plugins import hookspecs
     pm.add_hookspecs(hookspecs)
     pm.load_setuptools_entrypoints("kilnctrl")
 

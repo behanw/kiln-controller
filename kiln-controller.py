@@ -21,7 +21,7 @@ logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
 
-from plugins.load import get_pluginmanager
+from app.plugins.load import get_pluginmanager
 pm = get_pluginmanager()
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
