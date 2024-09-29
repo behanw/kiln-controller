@@ -3,7 +3,8 @@ import logging
 import config
 import digitalio
 
-from thermocouple import Thermocouple
+from .plugins import plugin_manager
+from .thermocouple import Thermocouple
 
 log = logging.getLogger(__name__)
 
@@ -14,8 +15,7 @@ class Output(object):
         config.gpio_heat
         config.gpio_heat_invert
     '''
-    def __init__(self, hook):
-        self.hook = hook
+    def __init__(self):
         self.active = False
         self.heater = digitalio.DigitalInOut(config.gpio_heat)
         self.heater.direction = digitalio.Direction.OUTPUT
@@ -24,13 +24,13 @@ class Output(object):
 
     def heat(self,sleepfor):
         self.heater.value = self.on
-        self.hook.activity()
+        plugin_manager.hook.activity()
         time.sleep(sleepfor)
 
     def cool(self,sleepfor):
         '''no active cooling, so sleep'''
         self.heater.value = self.off
-        self.hook.activity()
+        plugin_manager.hook.activity()
         time.sleep(sleepfor)
 
 # wrapper for blinka board
@@ -38,29 +38,28 @@ class Board(object):
     '''This represents a blinka board where this code
     runs.
     '''
-    def __init__(self, hook):
-        self.hook = hook
+    def __init__(self):
         log.info(self.name)
         self.thermocouple = Thermocouple.get()
         self.thermocouple.start()
 
     @staticmethod
-    def get(hook):
+    def get():
         if config.simulate == True:
-            return SimulatedBoard(hook)
+            return SimulatedBoard()
         else:
-            return RealBoard(hook)
+            return RealBoard()
 
 class RealBoard(Board):
     '''Each board has a thermocouple board attached to it.
     Any blinka board that supports SPI can be used. The
     board is automatically detected by blinka.
     '''
-    def __init__(self, hook):
+    def __init__(self):
         self.name = None
         self.load_libs()
-        self.output = Output(hook)
-        Board.__init__(self, hook)
+        self.output = Output()
+        Board.__init__(self)
 
     def load_libs(self):
         import board
@@ -70,7 +69,7 @@ class SimulatedBoard(Board):
     '''Simulated board used during simulations.
     See config.simulate
     '''
-    def __init__(self, hook):
+    def __init__(self):
         self.name = "simulated"
-        Board.__init__(self, hook)
+        Board.__init__(self)
 

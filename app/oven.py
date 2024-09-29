@@ -6,8 +6,9 @@ import json
 import config
 import os
 
-from firing_profile import Firing_Profile
-from app.board import Board
+from .plugins import plugin_manager
+from .firing_profile import Firing_Profile
+from .board import Board
 
 import pluggy
 
@@ -35,10 +36,9 @@ duplog = Duplogger().logref()
 class Oven(threading.Thread):
     '''parent oven class. this has all the common code
        for either a real or simulated oven'''
-    def __init__(self, hook):
-        self.hook = hook
+    def __init__(self):
         threading.Thread.__init__(self)
-        self.board = Board.get(hook)
+        self.board = Board.get()
         self.daemon = True
         self.temperature = 0
         self.time_step = config.sensor_time_wait
@@ -75,13 +75,13 @@ class Oven(threading.Thread):
             return json.dumps(self.pid.pidstats)
 
     @staticmethod
-    def getOven(hook):
+    def getOven():
         if config.simulate == True:
             log.info("this is a simulation")
-            return SimulatedOven(hook)
+            return SimulatedOven()
         else:
             log.info("this is a real kiln")
-            return RealOven(hook)
+            return RealOven()
 
     @staticmethod
     def get_start_from_temperature(profile, temp):
@@ -100,7 +100,7 @@ class Oven(threading.Thread):
         # the time this covers changes based on a few things
         numtemps = 60
         self.heat_rate_temps.append((runtime,temp))
-         
+
         # drop old temps off the list
         if len(self.heat_rate_temps) > numtemps:
             self.heat_rate_temps = self.heat_rate_temps[-1*numtemps:]
@@ -174,7 +174,7 @@ class Oven(threading.Thread):
             log.info("emergency!!! temperature too high")
             if config.ignore_temp_too_high == False:
                 self.abort_run()
-        
+
         if self.board.thermocouple.status.over_error_limit():
             log.info("emergency!!! too many errors in a short period")
             if config.ignore_tc_too_many_errors == False:
@@ -281,7 +281,7 @@ class Oven(threading.Thread):
     def run(self):
         while True:
             log.debug('Oven running on ' + threading.current_thread().name)
-            self.hook.activity()
+            plugin_manager.hook.activity()
             if self.idling():
                 if self.should_i_automatic_restart() == True:
                     self.automatic_restart()
@@ -305,7 +305,7 @@ class Oven(threading.Thread):
 
 class SimulatedOven(Oven):
 
-    def __init__(self, hook):
+    def __init__(self):
         self.t_env = config.sim_t_env
         self.c_heat = config.sim_c_heat
         self.c_oven = config.sim_c_oven
@@ -319,7 +319,7 @@ class SimulatedOven(Oven):
         self.t = config.sim_t_env  # deg C or F temp of oven
         self.t_h = self.t_env #deg C temp of heating element
 
-        super().__init__(hook)
+        super().__init__()
 
         self.start_time = self.get_start_time();
 
@@ -412,9 +412,9 @@ class SimulatedOven(Oven):
 
 class RealOven(Oven):
 
-    def __init__(self, hook):
+    def __init__(self):
         # call parent init
-        Oven.__init__(self, hook)
+        Oven.__init__(self)
 
         # start thread
         self.start()
@@ -509,7 +509,7 @@ class PID():
             output = sorted([-1 * window_size, output, window_size])[1]
             out4logs = output
             output = float(output / window_size)
-            
+
         self.lastErr = error
         self.lastNow = now
 

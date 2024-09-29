@@ -1,9 +1,10 @@
 import threading,logging,json,time,datetime
-from oven import Oven
 log = logging.getLogger(__name__)
 
+from .oven import Oven
+
 class OvenWatcher(threading.Thread):
-    def __init__(self,oven):
+    def __init__(self, oven):
         self.last_profile = None
         self.last_log = []
         self.started = None
@@ -50,11 +51,11 @@ class OvenWatcher(threading.Thread):
         #we just turned on, add first state for nice graph
         self.last_log.append(self.oven.get_state())
 
-    def add_observer(self,observer):
+    def add_observer(self, observer):
         if self.last_profile:
             p = {
                 "name": self.last_profile.name,
-                "data": self.last_profile.data, 
+                "data": self.last_profile.data,
                 "type" : "profile"
             }
         else:
