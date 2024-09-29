@@ -263,7 +263,7 @@ class Oven(threading.Thread):
         with open(config.automatic_restart_state_file) as infile: d = json.load(infile)
         startat = d["runtime"]/60
         filename = "%s.json" % (d["profile"])
-        profile_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'storage','profiles',filename))
+        profile_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), 'storage','profiles',filename))
 
         log.info("automatically restarting profile = %s at minute = %d" % (profile_path,startat))
         with open(profile_path) as infile:
