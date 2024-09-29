@@ -6,7 +6,7 @@ import time
 
 log = logging.getLogger(__name__)
 
-from app.plugins.kilnplugin import KilnPlugin
+from app.plugins import hookimpl, KilnPlugin
 
 class OneWire(object):
     bus = "/sys/bus/w1/devices/"
@@ -18,6 +18,7 @@ class OneWire(object):
 
     def scan(self):
         return glob.glob(self.bus + '28*')
+
 
 class DS18X20(object):
     def __init__(self, bus, device):
@@ -33,6 +34,7 @@ class DS18X20(object):
         f.close
         return temp / 1000 + self.adjustment
 
+
 class AmbientTemp(KilnPlugin):
     '''This reads ambient temperature from one or more
     DS18B20 sensors.
@@ -43,8 +45,8 @@ class AmbientTemp(KilnPlugin):
 
     sensors = {}
 
-    def __init__(self, hook=None):
-        super().__init__(hook)
+    def __init__(self):
+        super().__init__()
 
         # Read AmbientTemp GPIO
         #try:
@@ -77,10 +79,10 @@ class AmbientTemp(KilnPlugin):
                         sensor.temperature(), name))
             time.sleep(self.period)
 
-ambientobj = None
+ambientObj = None
 
-def startPlugin(hook=None):
-    global ambientobj
-    ambientobj = AmbientTemp(hook)
-    ambientobj.start()
-    return ambientobj
+@hookimpl
+def start_plugin():
+    global ambientObj
+    ambientObj = AmbientTemp()
+    ambientObj.start()

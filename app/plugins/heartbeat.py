@@ -5,14 +5,15 @@ import digitalio
 
 log = logging.getLogger(__name__)
 
-import app.plugins
-from app.plugins.kilnplugin import KilnPlugin
-
 Pattern = {
     "off": [(0, 1)],
     "heartbeat": [(1, .1), (0, .1), (1, .1), (0, .7)],
-    "fail": [(1, .25), (0, .1)]
+    "fail": [ (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, .4),
+        (1, .5), (0, .2), (1, .5), (0, .2), (1, .5), (0, .4),
+        (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, 1) ]
 }
+
+from app.plugins import hookimpl, KilnPlugin
 
 class Heartbeat(KilnPlugin):
     '''This represents a GPIO output that controls a
@@ -22,13 +23,13 @@ class Heartbeat(KilnPlugin):
         config.heartbeat_period
         config.heartbeat_verbose
     '''
-    def __init__(self, hook=None):
-        super().__init__(hook)
+    def __init__(self):
+        super().__init__()
 
         # Read Heartbeat GPIO
         try:
             self.led = digitalio.DigitalInOut(config.heartbeat_gpio)
-            self.led.direction = digitalio.Direction.OUTPUT 
+            self.led.direction = digitalio.Direction.OUTPUT
             self.simulated = False
         except:
             self.simulated = True
@@ -86,13 +87,14 @@ class Heartbeat(KilnPlugin):
 
 heartbeatObj = None
 
-def startPlugin(hook=None):
+@hookimpl
+def start_plugin():
     global heartbeatObj
-    heartbeatObj = Heartbeat(hook)
+    heartbeatObj = Heartbeat()
     heartbeatObj.start()
-    return heartbeatObj
 
-@app.plugins.hookimpl
+@hookimpl
 def activity():
     # Reset countdown
-    heartbeatObj.resetCountdown()
+    if heartbeatObj:
+        heartbeatObj.resetCountdown()

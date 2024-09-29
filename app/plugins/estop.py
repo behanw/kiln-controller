@@ -5,7 +5,7 @@ import digitalio
 
 log = logging.getLogger(__name__)
 
-from app.plugins.kilnplugin import KilnPlugin
+from app.plugins import hookimpl, KilnPlugin
 
 class Estop(KilnPlugin):
     '''This reads the state of the estop button.
@@ -15,13 +15,13 @@ class Estop(KilnPlugin):
         config.estop_invert
         config.estop_quiet
     '''
-    def __init__(self, hook=None):
-        super().__init__(hook)
+    def __init__(self):
+        super().__init__()
 
         # Read Estop Button GPIO
         try:
-            self.button = digitalio.DigitalInOut(config.estop_button_gpio)
-            self.button.direction = digitalio.Direction.INPUT 
+            self.button = digitalio.DigitalInOut(config.estop_gpio)
+            self.button.direction = digitalio.Direction.INPUT
             self.simulated = False
         except:
             self.simulated = True
@@ -62,9 +62,9 @@ class Estop(KilnPlugin):
 
 estopObj = None
 
-def startPlugin(hook=None):
+@hookimpl
+def start_plugin():
     global estopObj
-    estopObj = Estop(hook)
+    estopObj = Estop()
     estopObj.start()
-    return estopObj
 

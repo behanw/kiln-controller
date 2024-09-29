@@ -5,13 +5,12 @@ import digitalio
 
 log = logging.getLogger(__name__)
 
-import app.plugins
-from app.plugins.kilnplugin import KilnPlugin
-
 Pattern = {
     "off": [(0, 1)],
     "fail": [(1, .25), (0, .25)]
 }
+
+from app.plugins import hookimpl, KilnPlugin
 
 class Caution(KilnPlugin):
     '''This represents a GPIO output that controls a
@@ -20,15 +19,15 @@ class Caution(KilnPlugin):
         config.caution_invert
         config.caution_verbose
     '''
-    def __init__(self, hook=None):
-        super().__init__(hook)
+    def __init__(self):
+        super().__init__()
         self.fail = None
         self.pattern = Pattern["off"]
 
         # Read Caution LED GPIO
         try:
             self.led = digitalio.DigitalInOut(config.caution_gpio)
-            self.led.direction = digitalio.Direction.OUTPUT 
+            self.led.direction = digitalio.Direction.OUTPUT
             self.simulated = False
         except:
             self.simulated = True
@@ -84,18 +83,18 @@ class Caution(KilnPlugin):
 
 cautionObj = None
 
-def startPlugin(hook=None):
+@hookimpl
+def start_plugin():
     global cautionObj
-    cautionObj = Caution(hook)
+    cautionObj = Caution()
     cautionObj.start()
-    return cautionObj
 
-@app.plugins.hookimpl
+@hookimpl
 def failure(info):
     if cautionObj != None:
         cautionObj.setfail(info)
 
-@app.plugins.hookimpl
+@hookimpl
 def clear_failure(info):
     if cautionObj != None:
         cautionObj.clearfail()
