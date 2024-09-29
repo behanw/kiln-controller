@@ -1,5 +1,14 @@
-import pluggy
-hookspec = pluggy.HookspecMarker("kilnctrl")
+from app.plugins import hookspec
+
+@hookspec
+def start_plugin():
+    """Start plugins
+    """
+
+@hookspec
+def on_start():
+    """Run when app starts
+    """
 
 @hookspec
 def activity():
