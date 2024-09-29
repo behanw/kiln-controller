@@ -22,33 +22,33 @@ kilnWatcher = OvenWatcher(kiln)
 kiln.set_ovenwatcher(kilnWatcher)
 
 log = logging.getLogger(__name__)
-kilnapp = bottle.Bottle()
+app = bottle.Bottle()
 assets = os.path.join(os.path.dirname(os.path.realpath(__file__)), "public", "assets")
 
 # Configure Jinja2
-template_env = Environment(loader=FileSystemLoader('app/templates'))
+template_env = Environment(loader=FileSystemLoader('kilnapp/templates'))
 
 # Function to render Jinja2 templates
 def render_template(template_name, **context):
     return template_env.get_template(template_name).render(context)
 
-@kilnapp.route('/')
+@app.route('/')
 def index():
     return render_template('index.html')
 
 
-@kilnapp.route('/state')
+@app.route('/state')
 def state():
     return render_template('state.html')
 
 
-@kilnapp.get('/api/stats')
+@app.get('/api/stats')
 def handle_api():
     log.info("/api/stats command received")
     return kiln.pidstats()
 
 
-@kilnapp.post('/api')
+@app.post('/api')
 def handle_api():
     log.info("/api is alive")
 
@@ -104,7 +104,7 @@ def handle_api():
     return { "success" : True }
 
 
-@kilnapp.route('/assets/:filename#.*#')
+@app.route('/assets/:filename#.*#')
 def send_static(filename):
     log.debug("serving {}".format(filename))
     return bottle.static_file(filename, root=assets)
@@ -118,7 +118,7 @@ def get_websocket_from_request():
     return wsock
 
 
-@kilnapp.route('/control')
+@app.route('/control')
 def handle_control():
     wsock = get_websocket_from_request()
     log.info("websocket (control) opened")
@@ -147,7 +147,7 @@ def handle_control():
     log.info("websocket (control) closed")
 
 
-@kilnapp.route('/storage')
+@app.route('/storage')
 def handle_storage():
     wsock = get_websocket_from_request()
     log.info("websocket (storage) opened")
@@ -199,7 +199,7 @@ def get_config():
         "kwh_rate": config.kwh_rate,
         "currency_type": config.currency_type})
 
-@kilnapp.route('/config')
+@app.route('/config')
 def handle_config():
     wsock = get_websocket_from_request()
     log.info("websocket (config) opened")
@@ -213,7 +213,7 @@ def handle_config():
     log.info("websocket (config) closed")
 
 
-@kilnapp.route('/status')
+@app.route('/status')
 def handle_status():
     wsock = get_websocket_from_request()
     kilnWatcher.add_observer(wsock)

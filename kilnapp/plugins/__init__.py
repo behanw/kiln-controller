@@ -35,7 +35,7 @@ class KilnPlugin(threading.Thread):
         else:
             return msg
 
-from app.plugins import hookspecs
+from kilnapp.plugins import hookspecs
 plugin_manager.add_hookspecs(hookspecs)
 plugin_manager.load_setuptools_entrypoints('kilnctrl')
 

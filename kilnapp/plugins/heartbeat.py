@@ -13,7 +13,7 @@ Pattern = {
         (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, 1) ]
 }
 
-from app.plugins import hookimpl, KilnPlugin
+from kilnapp.plugins import hookimpl, KilnPlugin
 
 class Heartbeat(KilnPlugin):
     '''This represents a GPIO output that controls a

@@ -5,7 +5,7 @@ logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger(__name__)
 
 from .plugins import plugin_manager
-from .routes import kilnapp
+from .routes import app
 plugin_manager.hook.start_plugin()
 
 #import gevent
@@ -29,7 +29,7 @@ def main():
     plugin_manager.hook.on_start()
 
     log.info("Starting kiln controller")
-    server = WSGIServer((ip, port), kilnapp,
+    server = WSGIServer((ip, port), app,
                         handler_class=WebSocketHandler, **ssl_args)
     server.serve_forever()
 

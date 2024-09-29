@@ -5,7 +5,7 @@ import digitalio
 
 log = logging.getLogger(__name__)
 
-from app.plugins import hookimpl, KilnPlugin
+from kilnapp.plugins import hookimpl, KilnPlugin
 
 class Estop(KilnPlugin):
     '''This reads the state of the estop button.

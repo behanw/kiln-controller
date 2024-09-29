@@ -10,7 +10,7 @@ Pattern = {
     "fail": [(1, .25), (0, .25)]
 }
 
-from app.plugins import hookimpl, KilnPlugin
+from kilnapp.plugins import hookimpl, KilnPlugin
 
 class Caution(KilnPlugin):
     '''This represents a GPIO output that controls a

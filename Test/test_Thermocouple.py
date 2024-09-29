@@ -5,7 +5,7 @@ import math
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.thermocouple import Thermocouple
+from kilnapp.thermocouple import Thermocouple
 import config
 
 config.simulate = True

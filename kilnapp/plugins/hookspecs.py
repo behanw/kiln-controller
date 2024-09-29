@@ -1,4 +1,4 @@
-from app.plugins import hookspec
+from . import hookspec
 
 @hookspec
 def start_plugin():

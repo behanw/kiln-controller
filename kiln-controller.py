@@ -1,6 +1,6 @@
 #!/bin/env python3
 
-import app
+import kilnapp
 
 if __name__ == "__main__":
-    app.main()
+    kilnapp.main()
