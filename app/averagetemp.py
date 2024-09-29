@@ -11,7 +11,7 @@ class AverageTemp(object):
     def __init__(self):
         self.size = config.temperature_average_samples
         self.temps = [0 for i in range(self.size)]
-  
+
     def add(self,temp):
         self.temps.append(temp)
         while(len(self.temps) > self.size):

@@ -5,10 +5,11 @@ gevent
 gevent-websocket
 websocket-client
 requests
+jinja2
 pluggy
 
 # for folks running raspberry pis
-# we have no proof of anyone using another board yet, but when that 
+# we have no proof of anyone using another board yet, but when that
 # happens, you might want to comment this out.
 RPi.GPIO
 
