@@ -10,7 +10,7 @@ you to verify everything works as expected.
 
 ## Breadboard Orientation
 
-![Image](blob/refactor/app/public/assets/images/breadboard.png)
+![Image](assets/images/breadboard.png)
 
 If you're using a breadboard with a labeled break-out board, verify:
 

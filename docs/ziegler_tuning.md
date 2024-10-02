@@ -47,7 +47,7 @@ Copy & paste the pid_kp, pid_ki, and pid_kd values into config.py and restart th
 
 ## The values didn't work for me.
 
-The Ziegler Nicols estimate requires that your graph look similar to this: [kiln-tuner-example.png](kiln-tuner-example.png). The smooth linear part of the chart is very important. If it is too short, try increasing the target temperature (see later). The red diagonal line **must** follow the smooth part of your chart closely.
+The Ziegler Nicols estimate requires that your graph look similar to this: [kiln-tuner-example.png](assets/images/kiln-tuner-example.png). The smooth linear part of the chart is very important. If it is too short, try increasing the target temperature (see later). The red diagonal line **must** follow the smooth part of your chart closely.
 
 ## My diagonal line isn't right
 
