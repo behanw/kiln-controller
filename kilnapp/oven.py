@@ -37,6 +37,7 @@ class Oven(threading.Thread):
     '''parent oven class. this has all the common code
        for either a real or simulated oven'''
     def __init__(self):
+        self.pid = {}
         threading.Thread.__init__(self)
         self.board = Board.get()
         self.daemon = True
@@ -71,7 +72,7 @@ class Oven(threading.Thread):
     def running(self):
         return self.state == "RUNNING"
     def pidstats(self):
-        if hasattr(self, 'pid') and hasattr(self.pid, 'pidstats'):
+        if hasattr(self.pid, 'pidstats'):
             return json.dumps(self.pid.pidstats)
 
     @staticmethod
@@ -93,7 +94,7 @@ class Oven(threading.Thread):
             startat = 0
         return startat
 
-    def set_heat_rate(self,runtime,temp):
+    def set_heat_rate(self, runtime, temp):
         '''heat rate is the heating rate in degrees/hour
         '''
         # arbitrary number of samples
@@ -156,11 +157,9 @@ class Oven(threading.Thread):
                 self.catching_up = False;
 
     def update_runtime(self):
-
         runtime_delta = datetime.datetime.now() - self.start_time
         if runtime_delta.total_seconds() < 0:
             runtime_delta = datetime.timedelta(0)
-
         self.runtime = runtime_delta.total_seconds()
 
     def update_target_temp(self):
@@ -181,7 +180,7 @@ class Oven(threading.Thread):
     def reset_if_schedule_ended(self):
         if self.runtime > self.totaltime:
             log.info("schedule ended, shutting down")
-            log.info("total cost = %s%.2f" % (config.currency_type,self.cost))
+            log.info("total cost = %s%.2f" % (config.currency_type, self.cost))
             self.abort_run()
 
     def update_cost(self):
@@ -189,7 +188,7 @@ class Oven(threading.Thread):
             cost = (config.kwh_rate * config.kw_elements) * ((self.heat)/3600)
         else:
             cost = 0
-        self.cost = self.cost + cost
+        self.cost += cost
 
     def get_state(self):
         temp = 0
@@ -200,7 +199,7 @@ class Oven(threading.Thread):
             temp = 0
             pass
 
-        self.set_heat_rate(self.runtime,temp)
+        self.set_heat_rate(self.runtime, temp)
 
         state = {
             'cost': self.cost,
@@ -238,13 +237,13 @@ class Oven(threading.Thread):
 
     def save_automatic_restart_state(self):
         # only save state if the feature is enabled
-        if not config.automatic_restarts == True:
-            return False
-        self.save_state()
+        if config.automatic_restarts:
+            return self.save_state()
+        return False
 
     def should_i_automatic_restart(self):
         # only automatic restart if the feature is enabled
-        if not config.automatic_restarts == True:
+        if not config.automatic_restarts:
             return False
         if self.state_file_is_old():
             duplog.info("automatic restart not possible. state file does not exist or is too old.")
@@ -284,17 +283,13 @@ class Oven(threading.Thread):
                 if self.should_i_automatic_restart() == True:
                     self.automatic_restart()
                 time.sleep(1)
-            elif self.paused():
-                self.start_time = self.get_start_time()
-                self.update_runtime()
-                self.update_target_temp()
-                self.heat_then_cool()
-                self.reset_if_emergency()
-                self.reset_if_schedule_ended()
-            elif self.running():
-                self.update_cost()
-                self.save_automatic_restart_state()
-                self.kiln_must_catch_up()
+            else:
+                if self.paused():
+                    self.start_time = self.get_start_time()
+                elif self.running():
+                    self.update_cost()
+                    self.save_automatic_restart_state()
+                    self.kiln_must_catch_up()
                 self.update_runtime()
                 self.update_target_temp()
                 self.heat_then_cool()
