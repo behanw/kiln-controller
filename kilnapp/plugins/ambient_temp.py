@@ -4,7 +4,7 @@ import os
 import glob
 import time
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("plugins." + __name__)
 
 from kilnapp.plugins import hookimpl, KilnPlugin
 
@@ -40,7 +40,7 @@ class AmbientTemp(KilnPlugin):
     DS18B20 sensors.
         config.w1_ds18x20_label
         config.w1_ds18x20_adjustment
-        config.ambient_temp_quiet
+        config.ambient_temp_verbose
     '''
 
     sensors = {}
@@ -49,23 +49,23 @@ class AmbientTemp(KilnPlugin):
         super().__init__()
 
         # Read AmbientTemp GPIO
-        #try:
-        self.w1bus = OneWire()
-        self.w1devs = self.w1bus.scan()
-        for device in self.w1devs:
-            sensor = DS18X20(self.w1bus, device)
-            name = sensor.address
-            self.sensors[name] = sensor
-        self.simulated = False
-        #except:
-        #    self.simulated = True
+        try:
+            self.w1bus = OneWire()
+            self.w1devs = self.w1bus.scan()
+            for device in self.w1devs:
+                sensor = DS18X20(self.w1bus, device)
+                name = sensor.address
+                self.sensors[name] = sensor
+            self.simulated = False
+        except:
+            self.simulated = True
 
         # Quiet AmbientTemp during simulation for debugging
         try:
-            self.quiet = config.ambient_temp_quiet
+            self.verbose = config.ambient_temp_verbose
         except:
-            self.quiet = False
-        if self.simulated and self.quiet:
+            self.verbose = False
+        if self.simulated and self.verbose:
             log.warn("AmbientTemp disabled during simulation")
 
     # This method will be executed when the thread starts
@@ -74,7 +74,7 @@ class AmbientTemp(KilnPlugin):
 
         while True:
             for name, sensor in self.sensors.items():
-                if not self.quiet:
+                if self.verbose:
                     log.info("{:12} {:8.1f}C  {}".format(sensor.label, \
                         sensor.temperature(), name))
             time.sleep(self.period)
