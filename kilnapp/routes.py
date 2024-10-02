@@ -23,7 +23,8 @@ kiln.set_ovenwatcher(kilnWatcher)
 
 log = logging.getLogger(__name__)
 app = bottle.Bottle()
-assets = os.path.join(os.path.dirname(os.path.realpath(__file__)), "public", "assets")
+public = os.path.join(os.path.dirname(os.path.realpath(__file__)), "public")
+assets = os.path.join(public, "assets")
 
 # Configure Jinja2
 template_env = Environment(loader=FileSystemLoader('kilnapp/templates'))
@@ -102,6 +103,18 @@ def handle_api():
         return kiln.pidstats()
 
     return { "success" : True }
+
+
+@app.route('/android-chrome-192x192.png')
+@app.route('/android-chrome-512x512.png')
+@app.route('/apple-touch-icon.png')
+@app.route('/favicon-16x16.png')
+@app.route('/favicon-32x32.png')
+@app.route('/favicon.ico')
+@app.route('/site.webmanifest')
+def send_favicon():
+    log.info(bottle.request.path)
+    return bottle.static_file(bottle.request.path, root=public)
 
 
 @app.route('/assets/:filename#.*#')
