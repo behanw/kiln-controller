@@ -3,11 +3,20 @@ import config
 import time
 import digitalio
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("plugins." + __name__)
 
 Pattern = {
     "off": [(0, 1)],
-    "fail": [(1, .25), (0, .25)]
+    "fail": [(1, .2), (0, .2)],
+    "fail1": [(1, .2), (0, 1)],
+    "fail2": [(1, .2), (0, .2), (1, .2), (0, 1)],
+    "fail3": [(1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, 1)],
+    "fail4": [(1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, 1)],
+    "fail5": [(1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, 1)],
+    "fail6": [(1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, .2), (1, .2), (0, 1)],
+    "sos": [ (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, .4),
+        (1, .5), (0, .2), (1, .5), (0, .2), (1, .5), (0, .4),
+        (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, 1) ]
 }
 
 from kilnapp.plugins import hookimpl, KilnPlugin
@@ -91,10 +100,12 @@ def start_plugin():
 
 @hookimpl
 def failure(info):
+    log.info("Failure: {}".format(info["reason"]))
     if cautionObj != None:
         cautionObj.setfail(info)
 
 @hookimpl
 def clear_failure(info):
+    log.info("Clear Failure: {}".format(info["reason"]))
     if cautionObj != None:
         cautionObj.clearfail()
