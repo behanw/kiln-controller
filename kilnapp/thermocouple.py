@@ -74,6 +74,7 @@ class ThermocoupleReal(Thermocouple):
         Thermocouple.__init__(self)
         self.sleeptime = self.time_step / float(config.temperature_average_samples)
         self.averagetemp = AverageTemp()
+        self.offset = config.thermocouple_offset
 
         self.spi_setup()
 
@@ -111,7 +112,7 @@ class ThermocoupleReal(Thermocouple):
 
     def temperature(self):
         '''average temp over a duty cycle'''
-        return self.averagetemp.get_temp()
+        return self.averagetemp.get_temp() + self.offset
 
     def run(self):
         while True:
