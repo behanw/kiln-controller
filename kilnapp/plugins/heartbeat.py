@@ -3,12 +3,13 @@ import config
 import time
 import digitalio
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("plugins." + __name__)
 
 Pattern = {
     "off": [(0, 1)],
+    "fail": [(1, .2), (0, .2)],
     "heartbeat": [(1, .1), (0, .1), (1, .1), (0, .7)],
-    "fail": [ (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, .4),
+    "sos": [ (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, .4),
         (1, .5), (0, .2), (1, .5), (0, .2), (1, .5), (0, .4),
         (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, 1) ]
 }
@@ -80,7 +81,7 @@ class Heartbeat(KilnPlugin):
                 self.countdown = count - 1
                 self.playpattern(Pattern["heartbeat"], "Heartbeat")
             else:
-                self.playpattern(Pattern["fail"], "Fail")
+                self.playpattern(Pattern["sos"], "Fail")
 
     def resetCountdown(self):
         self.countdown = self.period
