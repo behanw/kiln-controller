@@ -5,6 +5,8 @@ import os
 #
 #   General options
 
+topdir = os.path.abspath(os.path.dirname( __file__ ))
+
 ### Logging
 log_level = logging.INFO
 log_format = '%(asctime)s %(levelname)s %(name)s: %(message)s'
@@ -18,8 +20,8 @@ use_tls = False
 if use_tls:
     listening_port = 443
     hostname = "fqdn.hostname.net"
-    https_certfile = "/path/to/ssl.crt"
-    https_keyfile = "/path/to/ssl.key"
+    https_certfile = os.path.join(topdir, "ssl.crt")
+    https_keyfile  = os.path.join(topdir, "ssl.key")
 
 ########################################################################
 # Cost Information
@@ -89,9 +91,15 @@ currency_type   = "$"   # Currency Symbol to show when calculating cost to run j
 # A single GPIO pin is used to control a relay which controls the kiln.
 # I use GPIO pin 23.
 
+Plugins = [
+    "ambient_temp",
+    "caution",
+    "current",
+    "estop",
+    "heartbeat",
+]
+
 try:
-    from digitalio import DigitalInOut
-    import busio
     import board
     spi_sclk  = board.D17    #spi clock
     spi_miso  = board.D27    #spi Microcomputer In Serial Out
@@ -100,13 +108,41 @@ try:
     gpio_heat = board.D23    #output that controls relay
     gpio_heat_invert = False #invert the output state
 
-    ambient_temp_gpio  = board.D4 # 1-wire bus for chassis temp
-    estop_button_gpio  = board.D24
-    #estop_button_invert = False
-    estop_led_gpio     = board.D27
-    #estop_led_invert = False
+    #ambient_temp_gpio  = board.D4 # 1-wire bus for chassis temp
+    w1_ds18x20_label = {
+            "28-000000854676": "Controller",
+            "28-412dd4467542": "Kiln",
+            "28-35e0d446d751": "Kiln"
+        }
+    w1_ds18x20_adjustment = {
+            "28-000000854676": -5.75,
+            "28-412dd4467542": -0.35,
+            "28-35e0d446d751": -0.35,
+        }
+    #ambient_temp_verbose = True
+
+    caution_gpio       = board.D27
+    caution_invert     = True
+
+    current_gpio       = board.D25 # ALRT pin
+    current_period     = 2 # Seconds
+    current_pga        = 1
+    current_adc_rate   = 860 # Samples per second
+    current_samples    = 256 # Samples
+    current_sensoramps = (100, 0.050) # Amps
+    current_inputamps  = 30 # Amps
+    current_vcc        = 5 # Volts
+    current_burden_res = 150 # Ohms
+    current_adc_bits   = 16 # bits
+    #current_verbose    = True
+
+    estop_gpio         = board.D24
+    #estop_invert      = True
+    #estop_verbose     = True
+
     heartbeat_gpio     = board.D22
-    #heartbeat_invert  = False
+    #heartbeat_invert  = True
+    #heartbeat_verbose  = True
 except (ImportError,NotImplementedError,AttributeError):
     print("not running on blinka recognized board, probably a simulation")
     simulate = True
@@ -203,7 +239,8 @@ time_scale_profile  = "m" # s = Seconds | m = Minutes | h = Hours - Enter and vi
 # naturally cool off. If your SSR has failed/shorted/closed circuit, this
 # means your kiln receives full power until your house burns down.
 # this should not replace you watching your kiln or use of a kiln-sitter
-emergency_shutoff_temp = 2264 #cone 7
+#emergency_shutoff_temp = 2264 # cone 7 in F
+emergency_shutoff_temp = 1238 # cone 7 in C
 
 # If the current temperature is outside the pid control window,
 # delay the schedule until it does back inside. This allows for heating
@@ -275,15 +312,15 @@ ignore_tc_too_many_errors = False
 # and is written in the same directory as config.py.
 automatic_restarts = True
 automatic_restart_window = 15 # max minutes since power outage
-automatic_restart_state_file = os.path.abspath(os.path.join(os.path.dirname( __file__ ),'state.json'))
+automatic_restart_state_file = os.path.join(topdir, "state.json")
 
 ########################################################################
 # load kiln profiles from this directory
 # created a repo where anyone can contribute profiles. The objective is
 # to load profiles from this repository by default.
 # See https://github.com/jbruce12000/kiln-profiles
-kiln_profiles_directory = os.path.abspath(os.path.join(os.path.dirname( __file__ ),"kilnapp/storage", "profiles"))
-#kiln_profiles_directory = os.path.abspath(os.path.join(os.path.dirname( __file__ ),'..','kilnapp/kiln-profiles','pottery'))
+kiln_profiles_directory = os.path.join(topdir, "kilnapp/storage", "profiles")
+#kiln_profiles_directory = os.path.join(topdir, 'kilnapp/kiln-profiles', 'pottery')
 
 
 ########################################################################
