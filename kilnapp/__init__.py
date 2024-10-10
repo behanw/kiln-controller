@@ -24,7 +24,7 @@ def main():
 
     ip = config.incoming_ip or "0.0.0.0"
     port = config.listening_port
-    log.info("listening on %s:%d" % (ip, port))
+    log.info("listening on {}:{}".format(ip, port))
 
     plugin_manager.hook.on_start()
 
