@@ -61,6 +61,9 @@ class Firing_Profile():
         except:
             self.unit = "f"
 
+    def __repr__(self):
+        return self.name
+
     @staticmethod
     def get_all_json():
         return json.dumps(read_all())
@@ -134,3 +137,11 @@ class Firing_Profile():
         incl = float(next_point[1] - prev_point[1]) / float(next_point[0] - prev_point[0])
         temp = prev_point[1] + (time - prev_point[0]) * incl
         return temp
+
+    def get_start_from_temperature(self, temp):
+        target_temp = self.get_target_temperature(0)
+        if temp > target_temp + 5:
+            startat = self.find_next_time_from_temperature(temp)
+            log.info("seek_start is in effect, starting at: {} s, {} deg".format(round(startat), round(temp)))
+            return startat
+        return 0
