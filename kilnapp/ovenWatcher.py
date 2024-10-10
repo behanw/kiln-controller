@@ -25,10 +25,9 @@ class OvenWatcher(threading.Thread):
 
     def run(self):
         while True:
-            oven_state = self.oven.get_state()
-           
+            oven_state = self.oven.state.get()
             # record state for any new clients that join
-            if oven_state.get("state") == "RUNNING":
+            if self.oven.state.running():
                 self.last_log.append(oven_state)
             else:
                 self.recording = False
@@ -49,7 +48,7 @@ class OvenWatcher(threading.Thread):
         self.started = datetime.datetime.now()
         self.recording = True
         #we just turned on, add first state for nice graph
-        self.last_log.append(self.oven.get_state())
+        self.last_log.append(self.oven.state.get())
 
     def add_observer(self, observer):
         if self.last_profile:
@@ -60,33 +59,31 @@ class OvenWatcher(threading.Thread):
             }
         else:
             p = None
-        
+
         backlog = {
             'type': "backlog",
             'profile': p,
             'log': self.lastlog_subset(),
             #'started': self.started
         }
-        print(backlog)
         backlog_json = json.dumps(backlog)
         try:
-            print(backlog_json)
             observer.send(backlog_json)
         except:
             log.error("Could not send backlog to new observer")
-        
+
         self.observers.append(observer)
 
-    def notify_all(self,message):
+    def notify_all(self, message):
         message_json = json.dumps(message)
-        log.debug("sending to %d clients: %s"%(len(self.observers),message_json))
+        log.debug("sending to {} clients: {}".format(len(self.observers), message_json))
 
         for wsock in self.observers:
             if wsock:
                 try:
                     wsock.send(message_json)
                 except:
-                    log.error("could not write to socket %s"%wsock)
+                    log.error("could not write to socket {}".format(wsock))
                     self.observers.remove(wsock)
             else:
                 self.observers.remove(wsock)
