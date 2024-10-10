@@ -24,13 +24,11 @@ class Output(object):
 
     def heat(self,sleepfor):
         self.heater.value = self.on
-        plugin_manager.hook.activity()
         time.sleep(sleepfor)
 
     def cool(self,sleepfor):
         '''no active cooling, so sleep'''
         self.heater.value = self.off
-        plugin_manager.hook.activity()
         time.sleep(sleepfor)
 
 # wrapper for blinka board
