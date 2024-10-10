@@ -18,6 +18,7 @@ class Estop(KilnPlugin):
     def __init__(self):
         super().__init__()
         self.active = True
+        self.record_estop("Okay")
 
         # Read Estop Button GPIO
         try:
@@ -41,6 +42,9 @@ class Estop(KilnPlugin):
             self.quiet = False
         if self.simulated and self.quiet:
             log.warn("Estop disabled during simulation")
+
+    def record_estop(self, status: str) -> None:
+        self.hook.record_meta(info={"estop": status})
 
     def ispressed(self):
         if self.simulated:
@@ -73,12 +77,14 @@ class Estop(KilnPlugin):
                     "pattern": "fail"
                     })
                 self.active = True
+                self.record_estop("STOP")
             elif self.active and self.isreleased():
                 self.hook.clear_failure(info={
                     "reason": "E-stop released",
                     "pattern": "off"
                     })
                 self.active = False
+                self.record_estop("Okay")
             time.sleep(self.period)
 
 estopObj = None

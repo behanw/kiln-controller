@@ -10,8 +10,7 @@ import board
 import digitalio
 import busio
 import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.ads1x15 import Mode
-from adafruit_ads1x15.ads1x15 import Comp_Mode
+from adafruit_ads1x15.ads1x15 import Comp_Mode, Mode
 from adafruit_ads1x15.analog_in import AnalogIn
 
 log = logging.getLogger("plugins." + __name__)
@@ -19,12 +18,6 @@ log = logging.getLogger("plugins." + __name__)
 from kilnapp.plugins import hookimpl, KilnPlugin
 
 pgafsr = [ 6.2114, 4.096, 2.048, 1.024, 0.512, 0.256 ]
-
-# Polynomial regression coefs to estimate amps
-# Based on experiments from 0 to 13 amps
-#A = 0.1051
-#B = 0.00324
-#C = 0.0000011614
 
 class SCT013(threading.Thread):
     amps = 0
@@ -72,6 +65,8 @@ class SCT013(threading.Thread):
                 log.warn("{}: I2C Input/output error, skipping sample".format(self.name))
                 continue
         self.amps = maxVolts * self.multiplier
+        if self.amps < 0.02:
+            self.amps = 0
 
         #log.info("Name: {}  Max: {}  Amps: {}".format(self.name, maxVolts, round(self.amps,3)))
 
@@ -162,8 +157,8 @@ class Current(KilnPlugin):
         self.ready = digitalio.DigitalInOut(config.current_gpio)
         self.ready.direction = digitalio.Direction.INPUT
 
-        self.sensor.append(SCT013(AnalogIn(ads, ADS.P0, ADS.P1), "Upper coil"))
-        self.sensor.append(SCT013(AnalogIn(ads, ADS.P2, ADS.P3), "Lower coil"))
+        self.sensor.append(SCT013(AnalogIn(ads, ADS.P0, ADS.P1), "upper_amps"))
+        self.sensor.append(SCT013(AnalogIn(ads, ADS.P2, ADS.P3), "lower_amps"))
 
         self.sensor[0].start()
         self.sensor[1].start()
@@ -185,9 +180,13 @@ class Current(KilnPlugin):
         log.info(self.message("Starting Current"))
 
         while True:
+            info = {}
             for sensor in self.sensor:
+                #self.hook.record_meta(info={sensor.name: round(sensor.amps, 2)})
+                info[sensor.name] = round(sensor.amps, 2)
                 if self.verbose:
                     log.info(sensor)
+            self.hook.record_meta(info=info)
             time.sleep(self.period)
 
 currentObj = None

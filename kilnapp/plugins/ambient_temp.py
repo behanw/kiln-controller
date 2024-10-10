@@ -29,10 +29,13 @@ class DS18X20(object):
         self.adjustment = config.w1_ds18x20_adjustment[self.address]
 
     def temperature(self):
-        f = open(self.device+"/temperature", 'r')
-        temp = int(f.readlines()[0])
-        f.close
-        return temp / 1000 + self.adjustment
+        try:
+            f = open(self.device+"/temperature", 'r')
+            temp = int(f.readlines()[0])
+            f.close
+            return temp / 1000 + self.adjustment
+        except IndexError:
+            return 0
 
 
 class AmbientTemp(KilnPlugin):
@@ -74,9 +77,10 @@ class AmbientTemp(KilnPlugin):
 
         while True:
             for name, sensor in self.sensors.items():
+                temp = sensor.temperature()
+                self.hook.record_meta(info={sensor.label: round(temp)})
                 if self.verbose:
-                    log.info("{:12} {:8.1f}C  {}".format(sensor.label, \
-                        sensor.temperature(), name))
+                    log.info("{:12} {:8.1f}C  {}".format(sensor.label, temp, name))
             time.sleep(self.period)
 
 ambientObj = None

@@ -46,7 +46,7 @@ class Heartbeat(KilnPlugin):
         try:
             self.period = config.heartbeat_period
         except:
-            self.period = 1
+            self.period = 2
         self.resetCountdown()
 
         # Verbose Heartbeat during simulation for debugging
@@ -56,6 +56,9 @@ class Heartbeat(KilnPlugin):
             self.verbose = False
         if self.simulated and self.verbose:
             log.warn("Heartbeat disabled during simulation")
+
+    def record_heartbeat(self, status: str) -> None:
+        self.hook.record_meta(info={"heartbeat": status})
 
     def play(self, pattern):
         for (state, delay) in pattern:
@@ -80,8 +83,10 @@ class Heartbeat(KilnPlugin):
             if count > 0:
                 self.countdown = count - 1
                 self.playpattern(Pattern["heartbeat"], "Heartbeat")
+                self.record_heartbeat("Okay")
             else:
                 self.playpattern(Pattern["sos"], "Fail")
+                self.record_heartbeat("SOS")
 
     def resetCountdown(self):
         self.countdown = self.period

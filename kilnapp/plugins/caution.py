@@ -1,6 +1,6 @@
 import logging
-import config
 import time
+import config
 import digitalio
 
 log = logging.getLogger("plugins." + __name__)
@@ -32,6 +32,7 @@ class Caution(KilnPlugin):
         super().__init__()
         self.fail = None
         self.pattern = Pattern["off"]
+        self.record_caution("Okay")
 
         # Read Caution LED GPIO
         try:
@@ -59,13 +60,18 @@ class Caution(KilnPlugin):
 
         self.clearfail()
 
+    def record_caution(self, status: str) -> None:
+        self.hook.record_meta(info={"caution": status})
+
     def setfail(self, info):
         self.fail = info["reason"]
         self.pattern = Pattern[info["pattern"] or "fail"]
+        self.record_caution("Fail")
 
     def clearfail(self):
         self.fail = False
         self.pattern = Pattern["off"]
+        self.record_caution("Okay")
 
     def turnled(self, state, delay=1):
         self.led.value = state
