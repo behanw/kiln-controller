@@ -61,6 +61,7 @@ class ThermocoupleSimulated(Thermocouple):
     def __init__(self):
         Thermocouple.__init__(self)
         self.simulated_temperature = config.sim_t_env
+
     def temperature(self):
         return self.simulated_temperature
 
@@ -103,10 +104,10 @@ class ThermocoupleReal(Thermocouple):
             return temp
         except ThermocoupleError as tce:
             if tce.ignore:
-                log.error("Problem reading temp (ignored) %s" % (tce.message))
+                log.error("Problem reading temp (ignored) {}".format(tce.message))
                 self.status.good()
             else:
-                log.error("Problem reading temp %s" % (tce.message))
+                log.error("Problem reading temp {}".format(tce.message))
                 self.status.bad()
         return None
 
