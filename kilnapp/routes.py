@@ -5,7 +5,7 @@ import logging
 import json
 
 import config
-from .plugins import plugin_manager
+from .plugins import hookimpl, plugin_manager
 from .oven import Oven
 from .ovenWatcher import OvenWatcher
 from .firing_profile import Firing_Profile
@@ -15,7 +15,6 @@ from jinja2 import Environment, FileSystemLoader
 #from bottle import post, get
 from geventwebsocket import WebSocketError
 
-#plugin_manager.hook.start_plugin()
 kiln = Oven.getOven()
 kilnWatcher = OvenWatcher(kiln)
 # this kilnwatcher is used in the oven class for restarts
@@ -23,15 +22,28 @@ kiln.set_ovenwatcher(kilnWatcher)
 
 log = logging.getLogger(__name__)
 app = bottle.Bottle()
-public = os.path.join(os.path.dirname(os.path.realpath(__file__)), "public")
+
+# Webserver paths
+try:
+    public = config.public_directory
+except AttributeError:
+    public = os.path.abspath(os.path.join(os.path.dirname(__file__), "public"))
 assets = os.path.join(public, "assets")
 
-# Configure Jinja2
-template_env = Environment(loader=FileSystemLoader('kilnapp/templates'))
+# Configure Jinja2 templates
+try:
+    template_dir = config.template_directory
+except AttributeError:
+    template_dir = 'kilnapp/templates'
+template_env = Environment(loader=FileSystemLoader(template_dir))
 
-# Function to render Jinja2 templates
+# Render Jinja2 templates
 def render_template(template_name, **context):
     return template_env.get_template(template_name).render(context)
+
+def logi(message: str):
+    if 'web' in config.log_subsystem:
+        log.info(message)
 
 @app.route('/')
 def index():
@@ -45,29 +57,24 @@ def state():
 
 @app.get('/api/stats')
 def handle_api():
-    log.info("/api/stats command received")
-    return kiln.pidstats()
+    logi("/api/stats command received")
+    return json.dumps(kiln.pidstats())
 
 
 @app.post('/api')
 def handle_api():
-    log.info("/api is alive")
+    logi("/api is alive")
 
     # run a kiln schedule
     if bottle.request.json['cmd'] == 'run':
         wanted = bottle.request.json['profile']
-        log.info('api requested run of profile = %s' % wanted)
+        logi('api requested run of profile = {}'.format(wanted))
 
         # start at a specific minute in the schedule
         # for restarting and skipping over early parts of a schedule
         startat = 0;
         if 'startat' in bottle.request.json:
             startat = bottle.request.json['startat']
-
-        #Shut off seek if start time has been set
-        allow_seek = True
-        if startat > 0:
-            allow_seek = False
 
         # get the wanted profile/kiln schedule
         try:
@@ -77,29 +84,29 @@ def handle_api():
         except e:
             raise(e)
 
-        kiln.run_profile(profile, startat=startat, allow_seek=allow_seek)
+        kiln.run_profile(profile, startat=startat)
         kilnWatcher.record(profile)
 
     elif bottle.request.json['cmd'] == 'pause':
-        log.info("api pause command received")
+        logi("api pause command received")
         kiln.pause()
 
     elif bottle.request.json['cmd'] == 'resume':
-        log.info("api resume command received")
+        logi("api resume command received")
         kiln.resume()
 
     elif bottle.request.json['cmd'] == 'stop':
-        log.info("api stop command received")
-        kiln.abort_run()
+        logi("api stop command received")
+        kiln.end_run()
 
     elif bottle.request.json['cmd'] == 'memo':
-        log.info("api memo command received")
+        logi("api memo command received")
         memo = bottle.request.json['memo']
-        log.info("memo=%s" % (memo))
+        logi("memo={}".format(memo))
 
     # get stats during a run
     elif bottle.request.json['cmd'] == 'stats':
-        log.info("api stats command received")
+        logi("api stats command received")
         return kiln.pidstats()
 
     return { "success" : True }
@@ -113,7 +120,7 @@ def handle_api():
 @app.route('/favicon.ico')
 @app.route('/site.webmanifest')
 def send_favicon():
-    log.info(bottle.request.path)
+    logi(bottle.request.path)
     return bottle.static_file(bottle.request.path, root=public)
 
 
@@ -134,42 +141,49 @@ def get_websocket_from_request():
 @app.route('/control')
 def handle_control():
     wsock = get_websocket_from_request()
-    log.info("websocket (control) opened")
+    logi("websocket (control) opened")
     while True:
         try:
             message = wsock.receive()
             if message:
-                log.info("Received (control): %s" % message)
+                logi("Received (control): {}".format(message))
                 msgdict = json.loads(message)
+
                 if msgdict.get("cmd") == "RUN":
-                    log.info("RUN command received")
+                    logi("RUN command received")
                     profile_obj = msgdict.get('profile')
                     if profile_obj:
                         profile = Firing_Profile(profile_obj)
-                    kiln.run_profile(profile)
-                    kilnWatcher.record(profile)
+                        kiln.run_profile(profile)
+                        kilnWatcher.record(profile)
+                    else:
+                        log.error("Invalid profile provided, or firing profile not found")
+
                 elif msgdict.get("cmd") == "SIMULATE":
-                    log.info("SIMULATE command received")
+                    logi("SIMULATE command received")
+
                 elif msgdict.get("cmd") == "STOP":
-                    log.info("Stop command received")
-                    kiln.abort_run()
+                    logi("Stop command received")
+                    kiln.end_run()
+
             time.sleep(1)
         except WebSocketError as e:
+            #log.warn("Error not covered")
             log.error(e)
             break
-    log.info("websocket (control) closed")
+    logi("websocket (control) closed")
 
 
 @app.route('/storage')
 def handle_storage():
     wsock = get_websocket_from_request()
-    log.info("websocket (storage) opened")
+    logi("websocket (storage) opened")
     while True:
         try:
             message = wsock.receive()
             if not message:
                 break
-            log.debug("websocket (storage) received: %s" % message)
+            log.debug("websocket (storage) received: {}".format(message))
 
             try:
                 msgdict = json.loads(message)
@@ -177,17 +191,19 @@ def handle_storage():
                 msgdict = {}
 
             if message == "GET":
-                log.info("GET command received")
+                logi("GET command received")
                 wsock.send(Firing_Profile.get_all_json())
+
             elif msgdict.get("cmd") == "DELETE":
-                log.info("DELETE command received")
+                logi("DELETE command received")
                 profile_obj = msgdict.get('profile')
                 if Firing_Profile.delete(profile_obj):
                   msgdict["resp"] = "OK"
                 wsock.send(json.dumps(msgdict))
                 #wsock.send(Firing_Profile.get_all_json())
+
             elif msgdict.get("cmd") == "PUT":
-                log.info("PUT command received")
+                logi("PUT command received")
                 profile_obj = msgdict.get('profile')
                 if profile_obj:
                     #del msgdict["cmd"]
@@ -195,14 +211,14 @@ def handle_storage():
                         msgdict["resp"] = "OK"
                     else:
                         msgdict["resp"] = "FAIL"
-                    log.debug("websocket (storage) sent: %s" % message)
+                    log.debug("websocket (storage) sent: {}".format(message))
 
                     wsock.send(json.dumps(msgdict))
                     wsock.send(Firing_Profile.get_all_json())
             time.sleep(1)
         except WebSocketError:
             break
-    log.info("websocket (storage) closed")
+    logi("websocket (storage) closed")
 
 
 def get_config():
@@ -212,10 +228,11 @@ def get_config():
         "kwh_rate": config.kwh_rate,
         "currency_type": config.currency_type})
 
+
 @app.route('/config')
 def handle_config():
     wsock = get_websocket_from_request()
-    log.info("websocket (config) opened")
+    logi("websocket (config) opened")
     while True:
         try:
             message = wsock.receive()
@@ -223,19 +240,19 @@ def handle_config():
         except WebSocketError:
             break
         time.sleep(1)
-    log.info("websocket (config) closed")
+    logi("websocket (config) closed")
 
 
 @app.route('/status')
 def handle_status():
     wsock = get_websocket_from_request()
     kilnWatcher.add_observer(wsock)
-    log.info("websocket (status) opened")
+    logi("websocket (status) opened")
     while True:
         try:
             message = wsock.receive()
-            wsock.send("Your message was: %r" % message)
+            wsock.send("Your message was: {}".format(message))
         except WebSocketError:
             break
         time.sleep(1)
-    log.info("websocket (status) closed")
+    logi("websocket (status) closed")
