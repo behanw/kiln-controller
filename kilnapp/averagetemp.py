@@ -12,12 +12,12 @@ class AverageTemp(object):
         self.size = config.temperature_average_samples
         self.temps = [0 for i in range(self.size)]
 
-    def add(self,temp):
+    def add(self, temp: float) -> None:
         self.temps.append(temp)
         while(len(self.temps) > self.size):
             del self.temps[0]
 
-    def get_temp(self, chop=25):
+    def get_temp(self) -> float:
         '''
         take the median of the given values. this used to take an avg
         after getting rid of outliers. median works better.
