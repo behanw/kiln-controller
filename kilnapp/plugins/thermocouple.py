@@ -176,15 +176,15 @@ class ThermocoupleError(Exception):
         super().__init__(self.message)
 
     def set_ignore(self):
-        if ignore_compare(self.message, "Not connected", "ignore_tc_lost_connection")
-            or ignore_compare(self.message, "Short circuit", "ignore_tc_short_errors")
-            or ignore_compare(self.message, "Unknown", "ignore_tc_unknown_error")
-            or ignore_compare(self.message, "Cold junction range fault", "ignore_tc_cold_junction_range_error")
-            or ignore_compare(self.message, "Thermocouple range fault", "ignore_tc_range_error")
-            or ignore_compare(self.message, "Cold junction temp too high", "ignore_tc_cold_junction_temp_high")
-            or ignore_compare(self.message, "Cold junction temp too low", "ignore_tc_cold_junction_temp_low")
-            or ignore_compare(self.message, "Thermocouple temp too high", "ignore_tc_temp_high")
-            or ignore_compare(self.message, "Thermocouple temp too low", "ignore_tc_temp_low")
+        if ignore_compare(self.message, "Not connected", "ignore_tc_lost_connection") \
+            or ignore_compare(self.message, "Short circuit", "ignore_tc_short_errors") \
+            or ignore_compare(self.message, "Unknown", "ignore_tc_unknown_error") \
+            or ignore_compare(self.message, "Cold junction range fault", "ignore_tc_cold_junction_range_error") \
+            or ignore_compare(self.message, "Thermocouple range fault", "ignore_tc_range_error") \
+            or ignore_compare(self.message, "Cold junction temp too high", "ignore_tc_cold_junction_temp_high") \
+            or ignore_compare(self.message, "Cold junction temp too low", "ignore_tc_cold_junction_temp_low") \
+            or ignore_compare(self.message, "Thermocouple temp too high", "ignore_tc_temp_high") \
+            or ignore_compare(self.message, "Thermocouple temp too low", "ignore_tc_temp_low") \
             or ignore_compare(self.message, "Voltage too high or low", "ignore_tc_voltage_error"):
             self.ignore = True
 
