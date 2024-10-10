@@ -3,7 +3,8 @@ import sys
 import logging
 import pluggy
 import threading
-import config
+
+from kilnapp.settings import setting
 
 log = logging.getLogger(__name__)
 
@@ -40,10 +41,11 @@ plugin_manager.add_hookspecs(hookspecs)
 plugin_manager.load_setuptools_entrypoints('kilnctrl')
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-plugin_dict = {}
-for name in config.Plugins:
-    log.info("Register "+name)
-    plugin_dict[name] = {}
+#plugin_dict = {}
+#for name in config.Plugins:
+for name in setting("Plugins", ["kiln_status"], "Plugin list missing"):
+    log.debug("Register "+name)
+    #plugin_dict[name] = {}
     obj = __import__(name)
     plugin_manager.register(obj)
-    plugin_dict[name]["import"] = obj
+    #plugin_dict[name]["import"] = obj
