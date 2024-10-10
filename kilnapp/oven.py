@@ -2,11 +2,11 @@ import threading
 import time
 import datetime
 import logging
-import json
+import log_throttling
 import config
-import os
 
-from .plugins import plugin_manager
+from .plugins import hookimpl, plugin_manager
+from .ovenState import OvenState
 from .firing_profile import Firing_Profile
 from .board import Board
 
@@ -25,7 +25,7 @@ class DupFilter(object):
 
 class Duplogger():
     def __init__(self):
-        self.log = logging.getLogger("%s.dupfree" % (__name__))
+        self.log = logging.getLogger("{}.dupfree".format(__name__))
         dup_filter = DupFilter()
         self.log.addFilter(dup_filter)
     def logref(self):
@@ -33,268 +33,221 @@ class Duplogger():
 
 duplog = Duplogger().logref()
 
+class FiringProfileEnded(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
 class Oven(threading.Thread):
     '''parent oven class. this has all the common code
        for either a real or simulated oven'''
     def __init__(self):
-        self.pid = {}
         threading.Thread.__init__(self)
         self.board = Board.get()
         self.daemon = True
-        self.temperature = 0
         self.time_step = config.sensor_time_wait
         self.reset()
 
-    def reset(self):
-        self.cost = 0
-        self.idle()
-        self.profile = None
-        self.start_time = 0
-        self.runtime = 0
-        self.totaltime = 0
-        self.target = 0
-        self.heat = 0
-        self.heat_rate = 0
-        self.heat_rate_temps = []
-        self.pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
-        self.catching_up = False
+    def reset(self, firing_profile: Firing_Profile=None, runtime: int=0) -> None:
+        self.state = OvenState(firing_profile, runtime)
 
-    def idle(self):
-        self.state = "IDLE"
-    def idling(self):
-        return self.state == "IDLE"
-    def pause(self):
-        self.state = "PAUSED"
-    def paused(self):
-        return self.state == "PAUSED"
-    def resume(self):
-        self.state = "RUNNING"
-    def running(self):
-        return self.state == "RUNNING"
     def pidstats(self):
-        if hasattr(self.pid, 'pidstats'):
-            return json.dumps(self.pid.pidstats)
+        return self.state.pid.get()
 
     @staticmethod
     def getOven():
         if config.simulate == True:
-            log.info("this is a simulation")
+            log.warn("this is a simulation")
             return SimulatedOven()
         else:
-            log.info("this is a real kiln")
+            log.warn("this is a real kiln")
             return RealOven()
 
-    @staticmethod
-    def get_start_from_temperature(profile, temp):
-        target_temp = profile.get_target_temperature(0)
-        if temp > target_temp + 5:
-            startat = profile.find_next_time_from_temperature(temp)
-            log.info("seek_start is in effect, starting at: {} s, {} deg".format(round(startat), round(temp)))
-        else:
-            startat = 0
-        return startat
+    def thermocouple_temperature(self) -> float:
+        #temp = self.board.thermocouple.temperature()
+        #self.state.set_temperature(temp)
+        temp = self.state.temperature
 
-    def set_heat_rate(self, runtime, temp):
-        '''heat rate is the heating rate in degrees/hour
-        '''
-        # arbitrary number of samples
-        # the time this covers changes based on a few things
-        numtemps = 60
-        self.heat_rate_temps.append((runtime,temp))
+        '''reset if the temperature is way TOO HOT, or other critical errors detected'''
+        if (temp >= config.emergency_shutoff_temp):
+            log.critical("Emergency!!! temperature too high")
+            self.hook.failure(info={
+                "reason": "Emergency!!! temperature too high",
+                "pattern": "fail2"
+                })
+            if config.ignore_temp_too_high == False:
+                self.abort_run()
 
-        # drop old temps off the list
-        if len(self.heat_rate_temps) > numtemps:
-            self.heat_rate_temps = self.heat_rate_temps[-1*numtemps:]
-        time2 = self.heat_rate_temps[-1][0]
-        time1 = self.heat_rate_temps[0][0]
-        temp2 = self.heat_rate_temps[-1][1]
-        temp1 = self.heat_rate_temps[0][1]
-        if time2 > time1:
-            self.heat_rate = ((temp2 - temp1) / (time2 - time1))*3600
+        elif self.board.thermocouple.status.over_error_limit():
+            log.critical("Emergency!!! too many errors in a short period")
+            self.hook.failure(info={
+                "reason": "Emergency!!! too many errors in a short period",
+                "pattern": "fail3"
+                })
+            if config.ignore_tc_too_many_errors == False:
+                self.abort_run()
 
-    def run_profile(self, profile, startat=0, allow_seek=True):
+        return temp
+
+    def run_profile(self, firing_profile, startat=0):
         log.debug('run_profile run on thread' + threading.current_thread().name)
-        runtime = startat * 60
-        if allow_seek:
-            if self.idling():
-                if config.seek_start:
-                    temp = self.board.thermocouple.temperature()  # Defined in a subclass
-                    runtime += self.get_start_from_temperature(profile, temp)
 
+        runtime = startat * 60
+        if config.seek_start and self.state.idling() and startat == 0:
+            temp = self.thermocouple_temperature()
+            runtime += firing_profile.get_start_from_temperature(temp)
+        self.reset(firing_profile, runtime)
+        self.state.set_start_time(datetime.datetime.now() - datetime.timedelta(seconds=startat * 60))
+
+        self.state.resume()
+        log.info("Starting firing profile {} at {} minutes".format(
+            self.state.profile.name, round(startat, 2)))
+
+        time.sleep(1)
+        self.ovenwatcher.record(self.state.profile) ### FIXME?
+
+    def end_run(self):
         self.reset()
-        self.startat = startat * 60
-        self.runtime = runtime
-        self.start_time = datetime.datetime.now() - datetime.timedelta(seconds=self.startat)
-        self.profile = profile
-        self.totaltime = profile.get_duration()
-        self.resume()
-        log.info("Running schedule %s starting at %d minutes" % (profile.name,startat))
-        log.info("Starting")
+        self.remove_automatic_restart_state()
 
     def abort_run(self):
-        self.reset()
-        self.save_automatic_restart_state()
+        name = self.state.profile.name
+        self.end_run()
+        raise FiringProfileEnded("Finished firing profile {}".format(name))
 
-    def get_start_time(self):
-        return datetime.datetime.now() - datetime.timedelta(milliseconds = self.runtime * 1000)
+    def reset_if_finished(self):
+        if self.state.finished():
+            log.info("Firing Profile ended: shutting down (total cost = {})".format(
+                self.state.get_cost()))
+            self.abort_run()
+
+    def update_start_time(self, scale=1):
+        self.state.set_start_time(datetime.datetime.now() \
+                - datetime.timedelta(milliseconds = self.state.runtime * 1000 / scale))
+
+    def update_runtime(self, scale=1):
+        runtime_delta = datetime.datetime.now() - self.state.start_time
+        if runtime_delta.total_seconds() < 0:
+            runtime_delta = datetime.timedelta(0)
+        #log.info("start_time: {}  runtime_delta: {}".format(self.state.start_time, runtime_delta.total_seconds()))
+        self.state.set_runtime(runtime_delta.total_seconds() * scale)
+        self.state.update_target_temp()
 
     def kiln_must_catch_up(self):
         '''shift the whole schedule forward in time by one time_step
         to wait for the kiln to catch up'''
         if config.kiln_must_catch_up == True:
-            temp = self.board.thermocouple.temperature()
+            temp = self.thermocouple_temperature()
             # kiln too cold, wait for it to heat up
-            if self.target - temp > config.pid_control_window:
-                log.info("kiln must catch up, too cold, shifting schedule")
-                self.start_time = self.get_start_time()
-                self.catching_up = True;
+            if self.state.target - temp > config.pid_control_window:
+                log_throttling.by_time(log, interval=config.log_throttle).warn(
+                        "kiln must catch up, too cold, shifting schedule")
+                self.update_start_time()
+                self.state.catchup()
             # kiln too hot, wait for it to cool down
-            elif temp - self.target > config.pid_control_window:
-                log.info("kiln must catch up, too hot, shifting schedule")
-                self.start_time = self.get_start_time()
-                self.catching_up = True;
+            elif temp - self.state.target > config.pid_control_window:
+                log_throttling.by_time(log, interval=config.log_throttle).warn(
+                        "kiln must catch up, too hot, shifting schedule")
+                self.update_start_time()
+                self.state.catchup()
             else:
-                self.catching_up = False;
+                self.state.caughtup()
 
-    def update_runtime(self):
-        runtime_delta = datetime.datetime.now() - self.start_time
-        if runtime_delta.total_seconds() < 0:
-            runtime_delta = datetime.timedelta(0)
-        self.runtime = runtime_delta.total_seconds()
-
-    def update_target_temp(self):
-        self.target = self.profile.get_target_temperature(self.runtime)
-
-    def reset_if_emergency(self):
-        '''reset if the temperature is way TOO HOT, or other critical errors detected'''
-        if (self.board.thermocouple.temperature() >= config.emergency_shutoff_temp):
-            log.info("emergency!!! temperature too high")
-            if config.ignore_temp_too_high == False:
-                self.abort_run()
-
-        if self.board.thermocouple.status.over_error_limit():
-            log.info("emergency!!! too many errors in a short period")
-            if config.ignore_tc_too_many_errors == False:
-                self.abort_run()
-
-    def reset_if_schedule_ended(self):
-        if self.runtime > self.totaltime:
-            log.info("schedule ended, shutting down")
-            log.info("total cost = %s%.2f" % (config.currency_type, self.cost))
-            self.abort_run()
-
-    def update_cost(self):
-        if self.heat:
-            cost = (config.kwh_rate * config.kw_elements) * ((self.heat)/3600)
-        else:
-            cost = 0
-        self.cost += cost
-
-    def get_state(self):
-        temp = 0
-        try:
-            temp = self.board.thermocouple.temperature()
-        except AttributeError as error:
-            # this happens at start-up with a simulated oven
-            temp = 0
-            pass
-
-        self.set_heat_rate(self.runtime, temp)
-
-        state = {
-            'cost': self.cost,
-            'runtime': self.runtime,
-            'temperature': temp,
-            'target': self.target,
-            'state': self.state,
-            'heat': self.heat,
-            'heat_rate': self.heat_rate,
-            'totaltime': self.totaltime,
-            'kwh_rate': config.kwh_rate,
-            'currency_type': config.currency_type,
-            'profile': self.profile.name if self.profile else None,
-            'pidstats': self.pid.pidstats,
-            'catching_up': self.catching_up,
-        }
-        return state
-
-    def save_state(self):
-        with open(config.automatic_restart_state_file, 'w', encoding='utf-8') as f:
-            json.dump(self.get_state(), f, ensure_ascii=False, indent=4)
-
-    def state_file_is_old(self):
-        '''returns True is state files is older than 15 mins default
-                   False if younger
-                   True if state file cannot be opened or does not exist
-        '''
-        if os.path.isfile(config.automatic_restart_state_file):
-            state_age = os.path.getmtime(config.automatic_restart_state_file)
-            now = time.time()
-            minutes = (now - state_age)/60
-            if(minutes <= config.automatic_restart_window):
-                return False
-        return True
+    def remove_automatic_restart_state(self):
+        self.state.delete()
 
     def save_automatic_restart_state(self):
         # only save state if the feature is enabled
         if config.automatic_restarts:
-            return self.save_state()
+            return self.state.store()
         return False
 
-    def should_i_automatic_restart(self):
+    def automatic_restart(self) -> bool:
         # only automatic restart if the feature is enabled
         if not config.automatic_restarts:
             return False
-        if self.state_file_is_old():
-            duplog.info("automatic restart not possible. state file does not exist or is too old.")
+        if self.state.too_old():
+            duplog.warn("automatic restart not possible. state file does not exist or is too old.")
             return False
 
-        with open(config.automatic_restart_state_file) as infile:
-            d = json.load(infile)
-        if d["state"] != "RUNNING":
-            duplog.info("automatic restart not possible. state = %s" % (d["state"]))
+        try:
+            laststate = self.state.load()
+        except EOFError:
+            duplog.warn("Saved state corrupt: restart not possible.")
             return False
+        except FileNotFoundError:
+            duplog.warn("Saved state missing: restart not possible.")
+            return False
+
+        if not laststate.running():
+            duplog.warn("automatic restart not possible. state = {}".format(
+                self.state.getstate()))
+            return False
+
+        self.state = laststate
+        # FIXME Should probably recalculate runtime and start_time?
+
+        self.state.resume()
+        startat = laststate.runtime / 60
+        log.info("Automatically restarting firing profile {} at {} minutes".format(
+            self.state.profile.name, round(startat, 2)))
+        time.sleep(1)
+        self.ovenwatcher.record(self.state.profile) ### FIXME?
         return True
 
-    def automatic_restart(self):
-        with open(config.automatic_restart_state_file) as infile: d = json.load(infile)
-        startat = d["runtime"]/60
-        filename = "{}.json".format(d["profile"])
-        profile_path = os.path.join(confit.kiln_profiles_directory, filename)
-
-        log.info("automatically restarting profile = %s at minute = %d" % (profile_path,startat))
-        with open(profile_path) as infile:
-            profile_obj = json.load(infile)
-        profile = Firing_Profile(profile_obj)
-        self.run_profile(profile, startat=startat, allow_seek=False)  # We don't want a seek on an auto restart.
-        self.cost = d["cost"]
-        time.sleep(1)
-        self.ovenwatcher.record(profile)
-
     def set_ovenwatcher(self,watcher):
-        log.info("ovenwatcher set in oven class")
+        log.debug("ovenwatcher set in oven class")
         self.ovenwatcher = watcher
 
+    def calculate_heat_on_off(self, now: datetime.datetime) -> tuple:
+        return self.state.pid_compute(self.thermocouple_temperature(), now)
+
     def run(self):
+        self.automatic_restart()
         while True:
             log.debug('Oven running on ' + threading.current_thread().name)
             plugin_manager.hook.activity()
-            if self.idling():
-                if self.should_i_automatic_restart() == True:
-                    self.automatic_restart()
+            if self.state.idling():
                 time.sleep(1)
             else:
-                if self.paused():
-                    self.start_time = self.get_start_time()
-                elif self.running():
-                    self.update_cost()
-                    self.save_automatic_restart_state()
-                    self.kiln_must_catch_up()
-                self.update_runtime()
-                self.update_target_temp()
-                self.heat_then_cool()
-                self.reset_if_emergency()
-                self.reset_if_schedule_ended()
+                try:
+                    if self.state.paused():
+                        self.update_start_time()
+                    elif self.state.running():
+                        self.state.update_cost()
+                        self.save_automatic_restart_state()
+                        self.kiln_must_catch_up()
+                    else:
+                        log.info("*** State: {}".format(self.state.getstate()))
+                        continue
+                    self.update_runtime()
+                    self.heat_then_cool()
+                    self.reset_if_finished()
+                except FiringProfileEnded as e:
+                    log.info(e)
+
+
+class RealOven(Oven):
+
+    def __init__(self):
+        # call parent init
+        Oven.__init__(self)
+
+        # start thread
+        self.start()
+
+    def reset(self, firing_profile: Firing_Profile=None, runtime: int=0) -> None:
+        super().reset(firing_profile, runtime)
+        self.board.output.cool(0)
+
+    def heat_then_cool(self):
+        (heat_on_time, heat_off_time, pid) = self.calculate_heat_on_off(datetime.datetime.now())
+
+        if heat_on_time:
+            self.board.output.heat(heat_on_time)
+        if heat_off_time:
+            self.board.output.cool(heat_off_time)
+
 
 class SimulatedOven(Oven):
 
@@ -314,29 +267,22 @@ class SimulatedOven(Oven):
 
         super().__init__()
 
-        self.start_time = self.get_start_time();
+        self.update_start_time()
 
         # start thread
         self.start()
         log.info("SimulatedOven started")
 
     # runtime is in sped up time, start_time is actual time of day
-    def get_start_time(self):
-        return datetime.datetime.now() - datetime.timedelta(milliseconds = self.runtime * 1000 / self.speedup_factor)
+    def update_start_time(self):
+        return super().update_start_time(self.speedup_factor)
 
     def update_runtime(self):
-        runtime_delta = datetime.datetime.now() - self.start_time
-        if runtime_delta.total_seconds() < 0:
-            runtime_delta = datetime.timedelta(0)
+        super().update_runtime(self.speedup_factor)
 
-        self.runtime = runtime_delta.total_seconds() * self.speedup_factor
-
-    def update_target_temp(self):
-        self.target = self.profile.get_target_temperature(self.runtime)
-
-    def heating_energy(self,pid):
-        # using pid here simulates the element being on for
-        # only part of the time_step
+    def heating_energy(self, pid):
+        """Using pid here simulates the element being on for
+        only part of the time_step"""
         self.Q_h = self.p_heat * self.time_step * pid
 
     def temp_changes(self):
@@ -353,175 +299,17 @@ class SimulatedOven(Oven):
         #temperature change of oven by cooling to environment
         self.p_env = (self.t - self.t_env) / self.R_o_nocool
         self.t -= self.p_env * self.time_step / self.c_oven
-        self.temperature = self.t
         self.board.thermocouple.simulated_temperature = self.t
 
     def heat_then_cool(self):
-        now_simulator = self.start_time + datetime.timedelta(milliseconds = self.runtime * 1000)
-        pid = self.pid.compute(self.target, self.board.thermocouple.temperature(), now_simulator)
-
-        heat_on = float(self.time_step * pid)
-        heat_off = float(self.time_step * (1 - pid))
+        now_simulator = self.state.start_time + datetime.timedelta(milliseconds = self.state.runtime * 1000)
+        (heat_on, heat_off, pid) = self.calculate_heat_on_off(now_simulator)
 
         self.heating_energy(pid)
         self.temp_changes()
-
-        # self.heat is for the front end to display if the heat is on
-        self.heat = 0.0
-        if heat_on > 0:
-            self.heat = heat_on
-
-        log.info("simulation: -> %dW heater: %.0f -> %dW oven: %.0f -> %dW env" % (int(self.p_heat * pid),
-            self.t_h,
-            int(self.p_ho),
-            self.t,
-            int(self.p_env)))
-
-        time_left = self.totaltime - self.runtime
-
-        try:
-            log.info("temp=%.2f, target=%.2f, error=%.2f, pid=%.2f, p=%.2f, i=%.2f, d=%.2f, heat_on=%.2f, heat_off=%.2f, run_time=%d, total_time=%d, time_left=%d" %
-                (self.pid.pidstats['ispoint'],
-                self.pid.pidstats['setpoint'],
-                self.pid.pidstats['err'],
-                self.pid.pidstats['pid'],
-                self.pid.pidstats['p'],
-                self.pid.pidstats['i'],
-                self.pid.pidstats['d'],
-                heat_on,
-                heat_off,
-                self.runtime,
-                self.totaltime,
-                time_left))
-        except KeyError:
-            pass
+        log.info("simulation: -> {}W heater: {.0f} -> {}W oven: {:.0f} -> {}W env".format(
+                 int(self.p_heat * pid), self.t_h, round(self.p_ho), self.t, round(self.p_env)))
 
         # we don't actually spend time heating & cooling during
         # a simulation, so sleep.
         time.sleep(self.time_step / self.speedup_factor)
-
-
-class RealOven(Oven):
-
-    def __init__(self):
-        # call parent init
-        Oven.__init__(self)
-
-        # start thread
-        self.start()
-
-    def reset(self):
-        super().reset()
-        self.board.output.cool(0)
-
-    def heat_then_cool(self):
-        pid = self.pid.compute(self.target, self.board.thermocouple.temperature(),
-                               datetime.datetime.now())
-
-        heat_on = float(self.time_step * pid)
-        heat_off = float(self.time_step * (1 - pid))
-
-        # self.heat is for the front end to display if the heat is on
-        self.heat = 0.0
-        if heat_on > 0:
-            self.heat = 1.0
-
-        if heat_on:
-            self.board.output.heat(heat_on)
-        if heat_off:
-            self.board.output.cool(heat_off)
-        time_left = self.totaltime - self.runtime
-        try:
-            log.info("temp=%.2f, target=%.2f, error=%.2f, pid=%.2f, p=%.2f, i=%.2f, d=%.2f, heat_on=%.2f, heat_off=%.2f, run_time=%d, total_time=%d, time_left=%d" %
-                (self.pid.pidstats['ispoint'],
-                self.pid.pidstats['setpoint'],
-                self.pid.pidstats['err'],
-                self.pid.pidstats['pid'],
-                self.pid.pidstats['p'],
-                self.pid.pidstats['i'],
-                self.pid.pidstats['d'],
-                heat_on,
-                heat_off,
-                self.runtime,
-                self.totaltime,
-                time_left))
-        except KeyError:
-            pass
-
-class PID():
-
-    def __init__(self, ki=1, kp=1, kd=1):
-        self.ki = ki
-        self.kp = kp
-        self.kd = kd
-        self.lastNow = datetime.datetime.now()
-        self.iterm = 0
-        self.lastErr = 0
-        self.pidstats = {}
-
-    # FIX - this was using a really small window where the PID control
-    # takes effect from -1 to 1. I changed this to various numbers and
-    # settled on -50 to 50 and then divide by 50 at the end. This results
-    # in a larger PID control window and much more accurate control...
-    # instead of what used to be binary on/off control.
-    def compute(self, setpoint, ispoint, now):
-        timeDelta = (now - self.lastNow).total_seconds()
-
-        window_size = 100
-
-        error = float(setpoint - ispoint)
-
-        # this removes the need for config.stop_integral_windup
-        # it turns the controller into a binary on/off switch
-        # any time it's outside the window defined by
-        # config.pid_control_window
-        icomp = 0
-        output = 0
-        out4logs = 0
-        dErr = 0
-        if error < (-1 * config.pid_control_window):
-            log.info("kiln outside pid control window, max cooling")
-            output = 0
-            # it is possible to set self.iterm=0 here and also below
-            # but I dont think its needed
-        elif error > (1 * config.pid_control_window):
-            log.info("kiln outside pid control window, max heating")
-            output = 1
-            if config.throttle_below_temp and config.throttle_percent:
-                if setpoint <= config.throttle_below_temp:
-                    output = config.throttle_percent/100
-                    log.info("max heating throttled at %d percent below %d degrees to prevent overshoot" % (config.throttle_percent,config.throttle_below_temp))
-        else:
-            icomp = (error * timeDelta * (1/self.ki))
-            self.iterm += (error * timeDelta * (1/self.ki))
-            dErr = (error - self.lastErr) / timeDelta
-            output = self.kp * error + self.iterm + self.kd * dErr
-            output = sorted([-1 * window_size, output, window_size])[1]
-            out4logs = output
-            output = float(output / window_size)
-
-        self.lastErr = error
-        self.lastNow = now
-
-        # no active cooling
-        if output < 0:
-            output = 0
-
-        self.pidstats = {
-            'time': time.mktime(now.timetuple()),
-            'timeDelta': timeDelta,
-            'setpoint': setpoint,
-            'ispoint': ispoint,
-            'err': error,
-            'errDelta': dErr,
-            'p': self.kp * error,
-            'i': self.iterm,
-            'd': self.kd * dErr,
-            'kp': self.kp,
-            'ki': self.ki,
-            'kd': self.kd,
-            'pid': out4logs,
-            'out': output,
-        }
-
-        return output
