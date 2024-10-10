@@ -499,6 +499,14 @@ $(document).ready(function()
             allow_dismiss: true,
             stackup_spacing: 10 // spacing between consecutively stacked growls.
           });
+	  setInterval(() => {
+            $.get(window.location.href, function(data) {
+              if(data) { 
+                window.location.reload();
+                //history.pushState(null, null, window.location.href);
+              }
+            });
+	  }, 5000);
         };
 
         ws_status.onmessage = function(e)
@@ -561,9 +569,6 @@ $(document).ready(function()
                     $('#state').html('<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span><span style="font-family: Digi; font-size: 40px;">' + eta + '</span>');
                     $('#target_temp').html(parseInt(x.target));
                     $('#cost').html(x.currency_type + parseFloat(x.cost).toFixed(2));
-                  
-
-
                 }
                 else
                 {
@@ -571,12 +576,21 @@ $(document).ready(function()
                     $("#nav_stop").hide();
                     $('#state').html('<p class="ds-text">'+state+'</p>');
                 }
-
                 $('#act_temp').html(parseInt(x.temperature));
+
                 heat_rate = parseInt(x.heat_rate)
                 if (heat_rate > 9999) { heat_rate = 9999; }
                 if (heat_rate < -9999) { heat_rate = -9999; }
                 $('#heat_rate').html(heat_rate);
+
+                $('#ext_ctrl_temp').html(parseInt(x.ext_ctrl_temp));
+                $('#ext_sitter_temp').html(parseInt(x.ext_sitter_temp));
+                $('#ext_upper_amps').html(parseFloat(x.ext_upper_amps));
+                $('#ext_lower_amps').html(parseFloat(x.ext_lower_amps));
+                $('#ext_caution').html(x.ext_caution);
+                $('#ext_estop').html(x.ext_estop);
+                $('#ext_heartbeat').html(x.ext_heartbeat);
+
                 if (typeof x.pidstats !== 'undefined') {
                     $('#heat').html('<div class="bar" style="height:'+x.pidstats.out*70+'%;"></div>')
                     }

@@ -5,6 +5,7 @@ gevent
 gevent-websocket
 websocket-client
 requests
+log_throttling
 jinja2
 pluggy
 

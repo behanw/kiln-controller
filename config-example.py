@@ -10,10 +10,17 @@ topdir = os.path.abspath(os.path.dirname( __file__ ))
 ### Logging
 log_level = logging.INFO
 log_format = '%(asctime)s %(levelname)s %(name)s: %(message)s'
+log_throttle = 30
+log_subsystem = [
+        #'web',
+        'plugins',
+        ]
 
 ### Server
 incoming_ip = "0.0.0.0"
 listening_port = 8081
+public_directory = os.path.join(topdir, 'kilnapp/public')
+template_directory = os.path.join(topdir, 'kilnapp/templates')
 
 ## TLS support
 use_tls = False
@@ -92,11 +99,13 @@ currency_type   = "$"   # Currency Symbol to show when calculating cost to run j
 # I use GPIO pin 23.
 
 Plugins = [
+    "kiln_status",
     "ambient_temp",
     "caution",
     "current",
     "estop",
     "heartbeat",
+    "test_status",
 ]
 
 try:
@@ -110,9 +119,9 @@ try:
 
     #ambient_temp_gpio  = board.D4 # 1-wire bus for chassis temp
     w1_ds18x20_label = {
-            "28-000000854676": "Controller",
-            "28-412dd4467542": "Kiln",
-            "28-35e0d446d751": "Kiln"
+            "28-000000854676": "ctrl_temp",
+            "28-412dd4467542": "sitter_temp",
+            "28-35e0d446d751": "sitter_temp"
         }
     w1_ds18x20_adjustment = {
             "28-000000854676": -5.75,
@@ -123,6 +132,7 @@ try:
 
     caution_gpio       = board.D27
     caution_invert     = True
+    #caution_verbose    = True
 
     current_gpio       = board.D25 # ALRT pin
     current_period     = 2 # Seconds
@@ -141,8 +151,10 @@ try:
     #estop_verbose     = True
 
     heartbeat_gpio     = board.D22
-    #heartbeat_invert  = True
+    heartbeat_invert   = True
+    heartbeat_period   = 2
     #heartbeat_verbose  = True
+
 except (ImportError,NotImplementedError,AttributeError):
     print("not running on blinka recognized board, probably a simulation")
     simulate = True
@@ -197,14 +209,6 @@ sensor_time_wait = 2
 pid_kp = 10   # Proportional 25,200,200
 pid_ki = 80   # Integral
 pid_kd = 220.83497910261562 # Derivative
-
-########################################################################
-#
-# Initial heating and Integral Windup
-#
-# this setting is deprecated and is no longer used. this happens by
-# default and is the expected behavior.
-stop_integral_windup = True
 
 ########################################################################
 #
@@ -268,6 +272,9 @@ thermocouple_offset=0
 # The median of these samples is used for the temperature.
 temperature_average_samples = 10
 
+# Number of samples over which to calculate heating rate
+heat_rate_samples = 60
+
 # Thermocouple AC frequency filtering - set to True if in a 50Hz locale, else leave at False for 60Hz locale
 ac_freq_50hz = False
 
@@ -312,7 +319,7 @@ ignore_tc_too_many_errors = False
 # and is written in the same directory as config.py.
 automatic_restarts = True
 automatic_restart_window = 15 # max minutes since power outage
-automatic_restart_state_file = os.path.join(topdir, "state.json")
+automatic_restart_state_directory = topdir
 
 ########################################################################
 # load kiln profiles from this directory
@@ -321,7 +328,6 @@ automatic_restart_state_file = os.path.join(topdir, "state.json")
 # See https://github.com/jbruce12000/kiln-profiles
 kiln_profiles_directory = os.path.join(topdir, "kilnapp/storage", "profiles")
 #kiln_profiles_directory = os.path.join(topdir, 'kilnapp/kiln-profiles', 'pottery')
-
 
 ########################################################################
 # low temperature throttling of elements
