@@ -14,30 +14,54 @@ def convert_temp(temp, converto):
         temp = math.ceil(temp * 9 / 5 + 32)
     return temp
 
-def convert_profile(profile, converto):
-    if profile["temp_units"] == converto:
-        return profile
-    profile["data"] = [ [duration, convert_temp(temp, converto)] for (duration, temp) in profile["data"] ]
-    profile["temp_units"] = converto
-    return profile
+def convert_profile(fprofile, converto):
+    if fprofile["temp_units"] == converto:
+        return fprofile
+    fprofile["data"] = [ [duration, convert_temp(temp, converto)] for (duration, temp) in fprofile["data"] ]
+    fprofile["temp_units"] = converto
+    return fprofile
 
-def convert_to_temp_scale(profile):
-    if "temp_units" not in profile:
-        profile["temp_units"] = 'f'
-    if config.temp_scale == profile["temp_units"]:
-        return profile
-    elif config.temp_scale == 'f' and profile["temp_units"] == 'c':
-        return convert_profile(profile, 'f')
+def convert_to_temp_scale(fprofile):
+    if "temp_units" not in fprofile:
+        fprofile["temp_units"] = 'f'
+    if config.temp_scale == fprofile["temp_units"]:
+        return fprofile
+    elif config.temp_scale == 'f' and fprofile["temp_units"] == 'c':
+        return convert_profile(fprofile, 'f')
     else:
-        return convert_profile(profile, 'c')
+        return convert_profile(fprofile, 'c')
 
-def add_temp_units(profile):
+def add_temp_units(fprofile):
     """
     always store the temperature in degrees c
     this way folks can share profiles
     """
-    profile['temp_units'] = config.temp_scale
-    return convert_profile(profile, 'c')
+    fprofile['temp_units'] = config.temp_scale
+    return convert_profile(fprofile, 'c')
+
+def add_rate(fprofile):
+    data = fprofile["data"]
+    last = len(data)
+    hold = 0
+    rates = []
+    for i in range(1, last):
+        if hold > 0:
+            hold = 0
+            continue
+        temp = data[i][1]
+        secs = data[i][0]
+        since = secs - data[i-1][0]
+        rate = round(3600 * (temp - data[i-1][1]) / since)
+        if rate == 0:
+            rates.append((0, temp, since))
+        else:
+            if i+1 < last and hold == 0 and temp == data[i+1][1]:
+                hold = data[i+1][0] - secs
+                rates.append((rate, temp, hold))
+            else:
+                rates.append((rate, temp, 0))
+    fprofile["rates"] = rates
+    return fprofile
 
 def get_filename(name):
     if not name.endswith(".json"):
@@ -46,7 +70,7 @@ def get_filename(name):
 
 def read_profile(name):
     with open(get_filename(name), 'r') as f:
-        return(convert_to_temp_scale(json.load(f)))
+        return(add_rate(convert_to_temp_scale(json.load(f))))
 
 def read_all():
     return [ read_profile(name) for name in os.listdir(config.kiln_profiles_directory) if name.endswith(".json") ]
@@ -73,19 +97,19 @@ class Firing_Profile():
         return Firing_Profile(read_profile(name))
 
     @staticmethod
-    def save(profile, force=True):
-        filepath = get_filename(profile["name"])
+    def save(fprofile, force=True):
+        filepath = get_filename(fprofile["name"])
         if not force and os.path.exists(filepath):
             log.error("Could not write, {} already exists".format(filepath))
             return False
         with open(filepath, 'w+') as f:
-            f.write(json.dumps(add_temp_units(profile)))
+            f.write(json.dumps(add_temp_units(fprofile)))
         log.info("Wrote {}".format(filepath))
         return True
 
     @staticmethod
-    def delete(profile):
-        filepath = get_filename(profile["name"])
+    def delete(fprofile):
+        filepath = get_filename(fprofile["name"])
         os.remove(filepath)
         log.info("Deleted {}".format(filepath))
         return True
