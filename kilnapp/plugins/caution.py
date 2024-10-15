@@ -56,7 +56,7 @@ class Caution(KilnPlugin):
         except:
             self.verbose = False
         if self.simulated and self.verbose:
-            log.warn("Caution disabled during simulation")
+            log.warning("Caution disabled during simulation")
 
         self.clearfail()
 

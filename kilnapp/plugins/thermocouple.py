@@ -388,7 +388,7 @@ class Thermocouples(KilnPlugin):
             if sleepy > 0:
                 time.sleep(sleepy)
             else:
-                log.warn("Ran out of time reading thermocouples.")
+                log.warning("Ran out of time reading thermocouples.")
 
 thermocoupleObj = None
 

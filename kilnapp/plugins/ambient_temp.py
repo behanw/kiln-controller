@@ -67,7 +67,7 @@ class AmbientTemp(KilnPlugin):
         except:
             self.verbose = False
         if self.simulated and self.verbose:
-            log.warn("AmbientTemp disabled during simulation")
+            log.warning("AmbientTemp disabled during simulation")
 
     # This method will be executed when the thread starts
     def run(self):

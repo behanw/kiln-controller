@@ -44,7 +44,7 @@ class SCT013(threading.Thread):
         outputamps = sensoramps[1] * inputamps / sensoramps[0]
         suggested_burdenres = round(config.current_vcc / 2 / outputamps)
         if(not math.isclose(a=suggested_burdenres, b=self.burdenres, rel_tol=20)):
-            log.warn("Burden resistor should be about {}, but it is set to {}".format(suggested_burdenres, self.burdenres))
+            log.warning("Burden resistor should be about {}, but it is set to {}".format(suggested_burdenres, self.burdenres))
 
         #vburden = outputamps * burdenres
         #fsrange = pgafsr[count.current_pga]
@@ -62,7 +62,7 @@ class SCT013(threading.Thread):
                 value = self.chan.value * self.vstep
                 maxVolts = max(maxVolts, abs(value))
             except OSError:
-                log.warn("{}: I2C Input/output error, skipping sample".format(self.name))
+                log.warning("{}: I2C Input/output error, skipping sample".format(self.name))
                 continue
         self.amps = maxVolts * self.multiplier
         if self.amps < 0.02:
@@ -99,7 +99,7 @@ class SCT013(threading.Thread):
                 value -= bias
                 accum += value * value
             else:
-                log.warn("Throwing away {}".format(value))
+                log.warning("Throwing away {}".format(value))
 
         vrms = 0
         if n > 0:
@@ -173,7 +173,7 @@ class Current(KilnPlugin):
         except:
             self.verbose = False
         if self.simulated and self.verbose:
-            log.warn("Current disabled during simulation")
+            log.warning("Current disabled during simulation")
 
     # This method will be executed when the thread starts
     def run(self):

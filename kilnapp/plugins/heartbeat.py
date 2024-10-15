@@ -55,7 +55,7 @@ class Heartbeat(KilnPlugin):
         except:
             self.verbose = False
         if self.simulated and self.verbose:
-            log.warn("Heartbeat disabled during simulation")
+            log.warning("Heartbeat disabled during simulation")
 
     def record_heartbeat(self, status: str) -> None:
         self.hook.record_meta(info={"heartbeat": status})

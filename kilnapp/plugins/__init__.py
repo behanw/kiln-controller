@@ -29,7 +29,7 @@ class KilnPlugin(threading.Thread):
         self.period = 1
 
     def __del__(self):
-        log.warn("Deleting {}".format(__name__))
+        log.warning("Deleting {}".format(__name__))
 
     def message(self, msg):
         if self.simulated:

@@ -57,10 +57,10 @@ class Oven(threading.Thread):
     @staticmethod
     def getOven():
         if config.simulate == True:
-            log.warn("this is a simulation")
+            log.warning("this is a simulation")
             return SimulatedOven()
         else:
-            log.warn("this is a real kiln")
+            log.warning("this is a real kiln")
             return RealOven()
 
     def thermocouple_temperature(self) -> float:
@@ -148,20 +148,20 @@ class Oven(threading.Thread):
         if not config.automatic_restarts:
             return False
         if self.state.too_old():
-            duplog.warn("automatic restart not possible. state file does not exist or is too old.")
+            duplog.warning("automatic restart not possible. state file does not exist or is too old.")
             return False
 
         try:
             laststate = self.state.load()
         except EOFError:
-            duplog.warn("Saved state corrupt: restart not possible.")
+            duplog.warning("Saved state corrupt: restart not possible.")
             return False
         except FileNotFoundError:
-            duplog.warn("Saved state missing: restart not possible.")
+            duplog.warning("Saved state missing: restart not possible.")
             return False
 
         if not laststate.running():
-            duplog.warn("automatic restart not possible. state = {}".format(
+            duplog.warning("automatic restart not possible. state = {}".format(
                 self.state.getstate()))
             return False
 

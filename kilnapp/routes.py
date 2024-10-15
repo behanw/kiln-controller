@@ -168,7 +168,7 @@ def handle_control():
 
             time.sleep(1)
         except WebSocketError as e:
-            #log.warn("Error not covered")
+            #log.warning("Error not covered")
             log.error(e)
             break
     logi("websocket (control) closed")

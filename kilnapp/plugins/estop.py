@@ -41,7 +41,7 @@ class Estop(KilnPlugin):
         except:
             self.quiet = False
         if self.simulated and self.quiet:
-            log.warn("Estop disabled during simulation")
+            log.warning("Estop disabled during simulation")
 
     def record_estop(self, status: str) -> None:
         self.hook.record_meta(info={"estop": status})
@@ -55,7 +55,7 @@ class Estop(KilnPlugin):
                 time.sleep(.1)
                 if self.button.value == self.pressed:
                     return True
-            log.warn("Estop needed to be debounced")
+            log.warning("Estop needed to be debounced")
         return False
 
     def isreleased(self):
@@ -71,7 +71,7 @@ class Estop(KilnPlugin):
 
         while True:
             if not self.active and self.ispressed():
-                #log.warn("button pressed")
+                #log.warning("button pressed")
                 self.hook.failure(info={
                     "reason": "E-stop engaged",
                     "pattern": "fail"
