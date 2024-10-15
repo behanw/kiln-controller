@@ -13,7 +13,6 @@ def get_profile(file = "test-fast", unit = "c"):
     config.temp_scale = unit
     return Firing_Profile.load(file)
 
-
 def test_load_save_profile():
     try:
         all_profiles = Firing_Profile.get_all_json()
