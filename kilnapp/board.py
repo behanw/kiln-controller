@@ -4,7 +4,6 @@ import config
 import digitalio
 
 from .plugins import plugin_manager
-from .thermocouple import Thermocouple
 
 log = logging.getLogger(__name__)
 
@@ -38,8 +37,6 @@ class Board(object):
     '''
     def __init__(self):
         log.info(self.name)
-        self.thermocouple = Thermocouple.get()
-        self.thermocouple.start()
 
     @staticmethod
     def get():
