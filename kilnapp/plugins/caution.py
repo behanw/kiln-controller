@@ -29,7 +29,7 @@ class Caution(KilnPlugin):
         config.caution_verbose
     '''
     def __init__(self):
-        super().__init__()
+        super().__init__(__name__)
         self.fail = None
         self.pattern = Pattern["off"]
         self.record_caution("Okay")

@@ -25,7 +25,7 @@ class Heartbeat(KilnPlugin):
         config.heartbeat_verbose
     '''
     def __init__(self):
-        super().__init__()
+        super().__init__(__name__)
 
         # Read Heartbeat GPIO
         try:

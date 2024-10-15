@@ -16,7 +16,7 @@ class Estop(KilnPlugin):
         config.estop_quiet
     '''
     def __init__(self):
-        super().__init__()
+        super().__init__(__name__)
         self.active = True
         self.record_estop("Okay")
 

@@ -29,9 +29,9 @@ class SCT013(threading.Thread):
         self.chan = chan
         self.name = name
 
-        self.vstep = 2 * pgafsr[config.current_pga] / pow(2, config.current_adc_bits - 1)
-        self.burdenres = config.current_burden_res
+        self.vstep = pgafsr[config.current_pga] / pow(2, config.current_adc_bits - 1)
         self.ratio = config.current_sensoramps[0] / config.current_sensoramps[1]
+        self.burdenres = config.current_burden_res
         self.multiplier = self.ratio / self.burdenres
         self.period = config.current_period
 
@@ -141,7 +141,7 @@ class Current(KilnPlugin):
     sensor = []
 
     def __init__(self):
-        super().__init__()
+        super().__init__(__name__)
 
         #try:
         self.period = config.current_period

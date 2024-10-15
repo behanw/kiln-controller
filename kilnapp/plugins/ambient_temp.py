@@ -30,10 +30,8 @@ class DS18X20(object):
 
     def temperature(self):
         try:
-            f = open(self.device+"/temperature", 'r')
-            temp = int(f.readlines()[0])
-            f.close
-            return temp / 1000 + self.adjustment
+            with open(self.device + "/temperature", 'r') as device:
+                return int(device.readlines()[0]) / 1000 + self.adjustment
         except IndexError:
             return 0
 
@@ -49,7 +47,7 @@ class AmbientTemp(KilnPlugin):
     sensors = {}
 
     def __init__(self):
-        super().__init__()
+        super().__init__(__name__)
 
         # Read AmbientTemp GPIO
         try:

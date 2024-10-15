@@ -11,7 +11,7 @@ class TestStatus(KilnPlugin):
         config.test_verbose
     '''
     def __init__(self):
-        super().__init__()
+        super().__init__(__name__)
 
     @hookimpl
     def record_meta(self, info: dict):

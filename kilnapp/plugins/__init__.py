@@ -16,9 +16,10 @@ hookimpl = pluggy.HookimplMarker("kilnctrl")
 plugin_manager = pluggy.PluginManager("kilnctrl")
 
 class KilnPlugin(threading.Thread):
-    def __init__(self):
+    def __init__(self, name: str="plugin"):
         threading.Thread.__init__(self)
         self.daemon = True
+        self.name = name
 
         # Simulation unless configured otherwise
         self.simulated = True
