@@ -1,6 +1,6 @@
 var state = "IDLE";
 var state_last = "";
-var graph = [ 'profile', 'live' ];
+var graph = [ 'profile', 'live', 'rate' ];
 var points = [];
 var profiles = [];
 var time_mode = 0;
@@ -13,6 +13,7 @@ var time_scale_long = "Seconds";
 var temp_scale_display = "C";
 var kwh_rate = 0.26;
 var currency_type = "EUR";
+var edit_type = "rate";
 
 var protocol = 'ws:';
 if (window.location.protocol == 'https:') {
@@ -36,6 +37,14 @@ graph.profile = {
 
 graph.live = {
     label: "Live",
+    data: [],
+    points: { show: false },
+    color: "#d8d3c5",
+    draggable: false
+};
+
+graph.rate = {
+    label: "Rate",
     data: [],
     points: { show: false },
     color: "#d8d3c5",
@@ -91,12 +100,132 @@ function updateProgress(percentage) {
     }
 }
 
+function convertProfile2Rate() {
+    data = graph.profile.data;
+    last = graph.profile.data.length;
+    rates = [];
+    for (var i=1; i<graph.profile.data.length; i++) {
+        temp = data[i][1];
+        secs = data[i][0];
+        since = secs - data[i-1][0];
+        rate = Math.round(3600 * (temp - data[i-1][1]) / since);
+        if (rate == 0) {
+            rates.push([0, temp, since]);
+        } else {
+            if (i+1 < last && temp == data[i+1][1]) {
+                i++;
+                rates.push([rate, temp, data[i][0] - secs]);
+            } else {
+                rates.push([rate, temp, 0]);
+            }
+        }
+        //console.log("Rate: " + rate + "  Temp: " + temp + "  Hold: " + hold)
+    }
+    graph.rate.data = rates;
+}
+
+function convertRate2Profile() {
+    rates = graph.rate.data;
+    if (temp_scale == "c") {
+        data = [[0, 20]];
+    } else {
+        data = [[0, 65]];
+    }
+
+    lastsecs = 0;
+    lasttemp = data[0][1];
+    for (var i=0; i<rates.length; i++) {
+        rate = rates[i][0];
+        temp = rates[i][1];
+        hold = rates[i][2];
+        secs = Math.round(60 * (temp - lasttemp) / rate) * 60 + lastsecs;
+        data.push([secs, temp]);
+        if (hold > 0) {
+            secs += hold;
+            data.push([secs, temp]);
+        }
+        lastsecs = secs;
+        lasttemp = temp;
+    }
+    graph.profile.data = data;
+}
+
 function updateProfileTable() {
+    if (edit_type == "rate") {
+        updateProfileTableRate()
+    } else {
+        updateProfileTablePoints()
+    }
+}
+
+function updateProfileTableRate() {
+    convertProfile2Rate();
+
+    var dph = 0;
+    var slope = "";
+    var color = "";
+
+    var html = '<h3>Schedule Rates</h3><div class="form-switch" style="align: right; margin: -3em 0 0 15em;"><label class="switch"><input type="checkbox" checked><span class="slider round"></span></div>';
+        html += '<div class="table-responsive" style="scroll: none"><table class="table table-striped">';
+        html += '<tr><th style="width: 50px">#</th><th>Rate in &deg;' + temp_scale_display + '/' + time_scale_slope
+                + '</th><th>Target Temperature in &deg;' + temp_scale_display + '</th><th>Hold Time in ' + time_scale_profile + '</th></tr>';
+
+    for (var i=0; i<graph.rate.data.length; i++) {
+        dph = graph.rate.data[i][0];
+        if (dph  > 0) {
+            slope = "up"; color="rgba(206, 5, 5, 1)";
+        } else if (dph  < 0) {
+            slope = "down"; color="rgba(23, 108, 204, 1)";
+        } else if (dph == 0) {
+            slope = "right"; color="grey";
+        }
+
+        html += '<tr><td><h4>' + (i+1) + '</h4></td>';
+        html += '<td><div class="input-group"><span class="glyphicon glyphicon-circle-arrow-' + slope + ' input-group-addon ds-trend" style="background: ' + color + '"></span><input type="text" class="form-control" id="profiletable-0-' + i + '" value="' + formatDPH(dph) + '" style="width: 60px" /></div></td>';
+        html += '<td><input type="text" class="form-control" id="profiletable-1-' + i + '" value="' + graph.rate.data[i][1] + '" style="width: 60px" /></td>';
+        html += '<td><input type="text" class="form-control" id="profiletable-2-' + i + '" value="' + timeProfileFormatter(graph.rate.data[i][2], true) + '" style="width: 60px" /></td>';
+        html += '<td>&nbsp;</td></tr>';
+    }
+
+    html += '</table></div>';
+
+    $('#profile_table').html(html);
+
+    $(".form-switch").change(function(e) {
+        edit_type = "points";
+        updateProfileTablePoints();
+    });
+
+    //Link table to graph
+    $(".form-control").change(function(e) {
+        var id = $(this)[0].id; //e.currentTarget.attributes.id
+        var value = parseInt($(this)[0].value);
+        var fields = id.split("-");
+        var col = parseInt(fields[1]);
+        var row = parseInt(fields[2]);
+
+        if (graph.profile.data.length > 0) {
+            if (col == 0) {
+                graph.rate.data[row][col] = value;
+            } else if (col == 1) {
+                graph.rate.data[row][col] = value;
+            } else {
+                graph.rate.data[row][col] = timeProfileFormatter(value, false);
+            }
+            convertRate2Profile();
+            graph.plot = $.plot("#graph_container", [ graph.profile, graph.live ], getOptions());
+        }
+        updateProfileTable();
+    });
+}
+
+function updateProfileTablePoints() {
     var dps = 0;
     var slope = "";
     var color = "";
 
-    var html = '<h3>Schedule Points</h3><div class="table-responsive" style="scroll: none"><table class="table table-striped">';
+    var html = '<h3>Schedule Points</h3><div class="form-switch" style="align: right; margin: -3em 0 0 15em;"><label class="switch"><input type="checkbox"><span class="slider round"></span></div>';
+        html += '<div class="table-responsive" style="scroll: none"><table class="table table-striped">';
         html += '<tr><th style="width: 50px">#</th><th>Target Time in ' + time_scale_long + '</th><th>Target Temperature in °' + temp_scale_display + '</th><th>Slope in &deg;' + temp_scale_display + '/' + time_scale_slope + '</th><th></th></tr>';
 
     for (var i=0; i<graph.profile.data.length; i++) {
@@ -115,6 +244,11 @@ function updateProfileTable() {
     html += '</table></div>';
 
     $('#profile_table').html(html);
+
+    $(".form-switch").change(function(e) {
+        edit_type = "rate";
+        updateProfileTableRate();
+    });
 
     //Link table to graph
     $(".form-control").change(function(e) {
@@ -153,9 +287,18 @@ function formatDPS(val) {
     var tval = val;
     if (time_scale_slope == "m") {
         tval = val * 60;
+    } else if (time_scale_slope == "h") {
+        tval = val * 3600;
     }
-    if (time_scale_slope == "h") {
-        tval = (val * 60) * 60;
+    return Math.round(tval);
+}
+
+function formatDPH(val) {
+    var tval = val;
+    if (time_scale_slope == "m") {
+        tval = val / 60;
+    } else if (time_scale_slope == "s") {
+        tval = val / 3600;
     }
     return Math.round(tval);
 }
@@ -312,7 +455,9 @@ function saveProfile() {
         last = rawdata[i][0];
     }
 
-    var profile = { "type": "profile", "data": data, "name": name }
+    convertProfile2Rate();
+
+    var profile = { "type": "profile", "data": data, "rate": graph.rate.data, "name": name, "temp_units": temp_scale }
     var put = { "cmd": "PUT", "profile": profile }
 
     var put_cmd = JSON.stringify(put);
@@ -592,7 +737,11 @@ $(document).ready(function() {
 
             // the message is an array of profiles
             // FIXME: this should be better, maybe a {"profiles": ...} container?
-            profiles = message;
+            profiles = message.sort(function(a, b){
+                if(a.name < b.name) return -1;
+                if(a.name > b.name) return 1;
+                return 0;
+            });
             // delete old options in select
             $('#e2').find('option').remove().end();
             // check if current selected value is a valid profile name
