@@ -67,27 +67,8 @@ class Oven(threading.Thread):
         #temp = self.board.thermocouple.temperature()
         #self.state.set_temperature(temp)
         temp = self.state.temperature
-
-        '''reset if the temperature is way TOO HOT, or other critical errors detected'''
-        if (temp >= config.emergency_shutoff_temp):
-            log.critical("Emergency!!! temperature too high")
-            self.hook.failure(info={
-                "reason": "Emergency!!! temperature too high",
-                "pattern": "fail2"
-                })
-            if config.ignore_temp_too_high == False:
-                self.abort_run()
-
-        elif self.board.thermocouple.status.over_error_limit():
-            log.critical("Emergency!!! too many errors in a short period")
-            self.hook.failure(info={
-                "reason": "Emergency!!! too many errors in a short period",
-                "pattern": "fail3"
-                })
-            if config.ignore_tc_too_many_errors == False:
-                self.abort_run()
-
         return temp
+
 
     def run_profile(self, firing_profile, startat=0):
         log.debug('run_profile run on thread' + threading.current_thread().name)

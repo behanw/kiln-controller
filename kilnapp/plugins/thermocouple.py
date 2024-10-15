@@ -43,7 +43,11 @@ class TempSamples(object):
         rates = [(self.samples[i][1] - self.samples[i-1][1]) * 3600 /
                  (self.samples[i][0] - self.samples[i-1][0]).total_seconds()
                  for i in range(rate_start, count)]
-        avgrate = statistics.mean(rates) if rates else 0
+        #medianrate = statistics.median(rates) if rates else 0
+        meanrate = statistics.mean(rates) if rates else 0
+        #interval = 3600 * (self.samples[-1][1] - self.samples[0][1]) / (self.samples[-1][0] - self.samples[0][0]).total_seconds()
+        #log.info("Heat Rate -> Count: {}  Median: {}  Mean: {}  Interval: {}".format(count, round(medianrate), round(meanrate), round(interval)))
+        avgrate = meanrate
 
         return { 'temperature': avgtemp, 'heat_rate': avgrate }
 
@@ -80,15 +84,17 @@ class Thermocouple(object):
     '''Used by the Board class. Each Board must have
     a Thermocouple.
     '''
-    def __init__(self, name: str):
+    def __init__(self, name: str, offset=0):
         super().__init__()
         self.name = name
+        self.offset = offset
         self.status = ThermocoupleStatus()
+        self.convert = ifsetting("temp_scale", "f", convert_to_fahrenheit, no_conversion)
 
 class ThermocoupleSimulated(Thermocouple):
     '''Simulates a temperature sensor '''
     def __init__(self, name: str, chipselect=0, typecode: str="K", offset=0):
-        super().__init__(name)
+        super().__init__(name, offset)
         #self.simulated_temperature = config.sim_t_env
         self.simulated_temperature = setting("sim_t_env")
 
@@ -102,21 +108,10 @@ class ThermocoupleReal(Thermocouple):
            config.temperature_average_samples
     '''
     def __init__(self, name: str, chipselect, offset=0):
-        super().__init__(name)
-        self.offset = offset
+        super().__init__(name, offset)
         self.samples = TempSamples()
 
-        #try:
-        #    if config.temp_scale.lower() == "f":
-        #        self.convert = convert_to_fahrenheit
-        #    else:
-        #        self.convert = no_conversion
-        #except AttributeError:
-        #    self.convert = no_conversion
-        self.convert = ifsetting("temp_scale", "f", convert_to_fahrenheit, no_conversion)
-
         self.spi_setup()
-
         import digitalio
         self.chipselect = chipselect
         self.cs = digitalio.DigitalInOut(self.chipselect)
@@ -164,7 +159,7 @@ class ThermocoupleError(Exception):
     each exception should be ignored based on settings in config.py.
     '''
     def __init__(self, message):
-        self.ignore = False
+        self.ignore = True
         self.message = message
         if not hasattr(self.__dict__, 'map'):
             self.orig_message = message
@@ -209,6 +204,7 @@ class Max31855(ThermocoupleReal):
         try:
             return self.thermocouple.temperature_NIST
         except RuntimeError as rte:
+            #print("My ERROR: {}".format(rte.args[0]))
             if rte.args and rte.args[0]:
                 raise Max31855_Error(rte.args[0])
             raise Max31855_Error('unknown')
@@ -225,6 +221,8 @@ class Max31855_Error(ThermocoupleError):
             "Thermocouple not connected" : "Not connected",
             "Short circuit to ground" : "Short circuit",
             "Short circuit to power" : "Short circuit",
+            "faulty reading" : "Fault",
+            "Total thermoelectric voltage out of range:-30.164012584223183": "Fault",
             "Only supports K-Type thermocouples": "Unsupported Thermocouple",
             }
         super().__init__(message)
@@ -296,7 +294,7 @@ from kilnapp.plugins import hookimpl, KilnPlugin
 
 class Thermocouples(KilnPlugin):
     def __init__(self, sensors):
-        super().__init__()
+        super().__init__(__name__)
         self.thermocouples = []
 
         try:
@@ -328,7 +326,25 @@ class Thermocouples(KilnPlugin):
                 raise ThermocoupleError("Not connected")
 
     def is_too_hot(self):
-        pass
+        '''reset if the temperature is way TOO HOT, or other critical errors detected'''
+        if (temp >= config.emergency_shutoff_temp):
+            log.critical("Emergency!!! temperature too high")
+            self.hook.failure(info={
+                "reason": "Emergency!!! temperature too high",
+                "pattern": "fail2"
+                })
+            if config.ignore_temp_too_high == False:
+                self.abort_run()
+
+        elif self.board.thermocouple.status.over_error_limit():
+            log.critical("Emergency!!! too many errors in a short period")
+            self.hook.failure(info={
+                "reason": "Emergency!!! too many errors in a short period",
+                "pattern": "fail3"
+                })
+            if config.ignore_tc_too_many_errors == False:
+                self.abort_run()
+
 
     def run(self):
         while True:
