@@ -8,6 +8,7 @@ requests
 log_throttling
 jinja2
 pluggy
+yaml
 
 # for folks running raspberry pis
 # we have no proof of anyone using another board yet, but when that
