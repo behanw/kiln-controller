@@ -124,7 +124,7 @@ def send_favicon():
     return bottle.static_file(bottle.request.path, root=public)
 
 
-@app.route('/assets/:filename#.*#')
+@app.route('/assets/<filename:re:.*>')
 def send_static(filename):
     log.debug("serving {}".format(filename))
     return bottle.static_file(filename, root=assets)

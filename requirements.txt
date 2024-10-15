@@ -1,6 +1,6 @@
 setuptools
 greenlet
-bottle
+bottle==0.13
 gevent
 gevent-websocket
 websocket-client
