@@ -6,7 +6,7 @@ log = logging.getLogger("plugins." + __name__)
 
 from kilnapp.plugins import hookimpl, KilnPlugin
 
-class TestStatus(KilnPlugin):
+class StatusTest(KilnPlugin):
     '''Testing of the status hooks for plugins.
         config.test_verbose
     '''
@@ -38,6 +38,6 @@ testStatusObj = None
 def start_plugin():
     log.info("Starting Test Status")
     #global testStatusObj
-    #testStatusObj = TestStatus()
+    #testStatusObj = StatusTest()
     #testStatusObj.start()
 
