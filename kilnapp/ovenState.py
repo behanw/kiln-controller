@@ -10,51 +10,7 @@ import config
 
 log = logging.getLogger(__name__)
 
-class JsonSerialize(object):
-    def to_json(self) -> str:
-        return json.dumps(self.get())
-
-    def __repr__(self) -> str:
-        return self.to_json()
-
-
-class HeatRate(JsonSerialize):
-    '''HeatRate is the heating rate in degrees/hour over the last configured
-    number of samples.
-    '''
-    def __init__(self):
-        self.heat_rate = 0
-        self.heat_rate_temps = []
-
-        self.samples = 60
-        try:
-            self.samples = config.heat_rate_samples
-        except AttributeError:
-            pass
-
-    def get(self) -> str:
-        return self.heat_rate
-
-    def set(self, runtime: int, temp: float) -> None:
-        # arbitrary number of samples
-        # the time this covers changes based on a few things
-        self.heat_rate_temps.append((runtime, temp))
-
-        # drop oldest temps to keep samples samples
-        #log.info("*** Numtemps = {}".format(self.samples))
-        self.heat_rate_temps = self.heat_rate_temps[-self.samples:]
-        (time1, temp1) = (self.heat_rate_temps[0])
-        (time2, temp2) = (self.heat_rate_temps[-1])
-        if time2 > time1:
-            self.heat_rate = ((temp2 - temp1) / (time2 - time1)) * 3600
-
-        #log_throttling.by_time(log, interval=config.log_throttle).info(
-        #        "(time, temp) ({}, {}) -> ({}, {}) {} ({}, {}) -> {}".format(
-        #        runtime, temp, time1, temp1, len(self.heat_rate_temps),
-        #        time2, temp2, self.heat_rate))
-
-
-class PID(JsonSerialize):
+class PID(object):
     def __init__(self, kp: float=config.pid_kp, ki: float=config.pid_ki, kd: float=config.pid_kd):
         self.lastNow = datetime.datetime.now()
         self.time = 0
@@ -161,7 +117,7 @@ except AttributeError:
 state_file = os.path.abspath(os.path.join(state_directory, 'state.pkl'))
 log.info("Looking for restart info at {}".format(state_file))
 
-class OvenState(JsonSerialize):
+class OvenState(object):
     prefix = "ext_"
     minutes_too_old = config.automatic_restart_window
 
@@ -192,7 +148,6 @@ class OvenState(JsonSerialize):
         # Whether or not heat is enabled
         self.heat = 0
         # Current averate heat rate
-        #self.heat_rate = HeatRate()
         self.heat_rate = 0
         # PID controller
         self.pid = PID()
@@ -209,8 +164,6 @@ class OvenState(JsonSerialize):
         if key:
             return self.__dict__[prefix + key]
         else:
-            #self.heat_rate.set(self.runtime, self.temperature)
-            #self.rate = round(self.heat_rate.get())
             state = {
                 'state': self.state,
                 'profile': self.profile.name if self.profile else None,
@@ -232,13 +185,6 @@ class OvenState(JsonSerialize):
                     state[key] = value
             log.debug(state)
             return state
-
-    def get_time(self):
-        return {
-                'start_time': self.start_time,
-                'runtime': self.runtime,
-                'totaltime': self.totaltime,
-                }
 
     def log_heat_state(self, heat_on_time, heat_off_time):
         try:
@@ -297,11 +243,17 @@ class OvenState(JsonSerialize):
     def set_runtime(self, runtime):
         #log.info("runtime: {}".format(round(runtime, 2)))
         self.runtime = runtime
-        #self.heat_rate.set(runtime, self.temperature)
     def get_runtime(self):
         return self.runtime
     def get_totaltime(self):
         return self.totaltime
+
+    def get_time(self):
+        return {
+                'start_time': self.start_time,
+                'runtime': self.runtime,
+                'totaltime': self.totaltime,
+                }
 
 
     def catchup(self):
@@ -309,10 +261,6 @@ class OvenState(JsonSerialize):
     def caughtup(self):
         self.catching_up = False
 
-    def heat_on(self, value):
-        self.heat = value
-    def heat_off(self):
-        self.heat = 0
     def set_temperatures(self, meta):
         #log.info("meta: {}".format(meta))
         for key in ['temperature', 'heat_rate', 'thermocouples']:
@@ -322,17 +270,12 @@ class OvenState(JsonSerialize):
                 #log.info("key[{}]: {}".format(key, meta[key]))
                 self.__dict__[key] = meta[key]
         #log.info("temp: {}".format(self.temperature))
-    #def set_temperature(self, temp: float) -> float:
-    #    #self.temperature = temp;
-    #    #self.heat_rate.set(self.runtime, temp)
-    #    #return temp
-    #    pass
-#
+
     def get_cost(self):
         return "{}{:.2f}".format(self.currency_type, self.cost)
     def update_cost(self):
         if self.heat:
-            self.cost += (self.kwh_rate * config.kw_elements) * ((self.heat)/3600)
+            self.cost += (self.kwh_rate * config.kw_elements) * ((self.heat) / 3600)
 
     def update_target_temp(self):
         self.target = self.profile.get_target_temperature(self.runtime) if self.profile else 0
@@ -345,9 +288,9 @@ class OvenState(JsonSerialize):
 
         # For the front end to display if the heat is on
         if heat_on_time > 0:
-            self.heat_on(heat_on_time)
+            self.heat = heat_on_time
         else:
-            self.heat_off()
+            self.heat = 0
 
         self.log_heat_state(heat_on_time, heat_off_time)
 
