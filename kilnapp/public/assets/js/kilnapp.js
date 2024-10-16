@@ -6,7 +6,7 @@ var profiles = [];
 var time_mode = 0;
 var selected_profile = 0;
 var selected_profile_name = 'cone-05-long-bisque.json';
-var temp_scale = "c";
+var temp_scale = "C";
 var time_scale_slope = "s";
 var time_scale_profile = "h";
 var time_scale_long = "Seconds";
@@ -126,7 +126,7 @@ function convertProfile2Rate() {
 
 function convertRate2Profile() {
     rates = graph.rate.data;
-    if (temp_scale == "c") {
+    if (temp_scale == "C") {
         data = [[0, 20]];
     } else {
         data = [[0, 65]];
@@ -304,7 +304,7 @@ function formatDPH(val) {
 }
 
 function hazardTemp() {
-    if (temp_scale == "f") {
+    if (temp_scale == "F") {
         return (1500 * 9 / 5) + 32
     } else {
         return 1500
@@ -676,7 +676,7 @@ $(document).ready(function() {
             kwh_rate = x.kwh_rate;
             currency_type = x.currency_type;
 
-            if (temp_scale == "c") {temp_scale_display = "C";} else {temp_scale_display = "F";}
+            if (temp_scale == "C") {temp_scale_display = "C";} else {temp_scale_display = "F";}
 
             $('#act_temp_scale').html('º' + temp_scale_display);
             $('#target_temp_scale').html('º' + temp_scale_display);

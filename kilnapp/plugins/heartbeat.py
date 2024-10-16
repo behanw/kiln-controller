@@ -1,7 +1,7 @@
 import logging
-import config
 import time
-import digitalio
+
+from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
@@ -19,43 +19,29 @@ from kilnapp.plugins import hookimpl, KilnPlugin
 class Heartbeat(KilnPlugin):
     '''This represents a GPIO output that controls a
     status LED which beats like a heart.
-        config.heartbeat_gpio
-        config.heartbeat_invert
-        config.heartbeat_period
-        config.heartbeat_verbose
     '''
     def __init__(self):
         super().__init__(__name__)
 
         # Read Heartbeat GPIO
         try:
-            self.led = digitalio.DigitalInOut(config.heartbeat_gpio)
+            import digitalio
+            pin = config.get_pin('plugins.heartbeat.led.gpio.pin')
+            self.led = digitalio.DigitalInOut(pin)
             self.led.direction = digitalio.Direction.OUTPUT
             self.simulated = False
         except:
             self.simulated = True
 
         # Read Heartbeat active-high or active-low
-        try:
-            self.off = config.heartbeat_invert
-        except:
-            self.off = False
+        self.off = config.get('plugins.heartbeat.led.gpio.inverted', False)
         self.on = not self.off
 
         # Read Heartbeat period
-        try:
-            self.period = config.heartbeat_period
-        except:
-            self.period = 2
+        self.period = config.get_time_in_unit('plugins.heartbeat.period', 's')
         self.resetCountdown()
 
-        # Verbose Heartbeat during simulation for debugging
-        try:
-            self.verbose = config.heartbeat_verbose
-        except:
-            self.verbose = False
-        if self.simulated and self.verbose:
-            log.warning("Heartbeat disabled during simulation")
+        self.verbose = config.get_log_subsystem('heartbeat')
 
     def record_heartbeat(self, status: str) -> None:
         self.hook.record_meta(info={"heartbeat": status})

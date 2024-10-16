@@ -3,16 +3,15 @@ import time
 import datetime
 import logging
 import log_throttling
-import config
 
+from settings import config
 from .plugins import hookimpl, plugin_manager
 from .ovenState import OvenState
 from .firing_profile import Firing_Profile
 from .board import Board
 
-import pluggy
-
 log = logging.getLogger(__name__)
+log_throttle = config.get('general.logging.throttle', 60)
 
 class DupFilter(object):
     def __init__(self):
@@ -45,7 +44,13 @@ class Oven(threading.Thread):
         threading.Thread.__init__(self)
         self.board = Board.get()
         self.daemon = True
-        self.time_step = config.sensor_time_wait
+
+        self.restart = config.get('general.restart.enable', True)
+        self.time_step = config.get('oven.duty_cycle')
+        self.seek_start = config.get('oven.seek_start', False)
+        self.must_catchup = config.get('oven.must_catch_up', True)
+        self.control_window = config.get_temp('oven.pid_control_window',
+                                              'Need to specify PID control window in settings')[0]
         self.reset()
 
     def reset(self, firing_profile: Firing_Profile=None, runtime: int=0) -> None:
@@ -56,7 +61,7 @@ class Oven(threading.Thread):
 
     @staticmethod
     def getOven():
-        if config.simulate == True:
+        if config.get('general.simulate', False):
             log.warning("this is a simulation")
             return SimulatedOven()
         else:
@@ -69,12 +74,11 @@ class Oven(threading.Thread):
         temp = self.state.temperature
         return temp
 
-
     def run_profile(self, firing_profile, startat=0):
         log.debug('run_profile run on thread' + threading.current_thread().name)
 
         runtime = startat * 60
-        if config.seek_start and self.state.idling() and startat == 0:
+        if selt.seek_start and self.state.idling() and startat == 0:
             temp = self.thermocouple_temperature()
             runtime += firing_profile.get_start_from_temperature(temp)
         self.reset(firing_profile, runtime)
@@ -117,17 +121,17 @@ class Oven(threading.Thread):
     def kiln_must_catch_up(self):
         '''shift the whole schedule forward in time by one time_step
         to wait for the kiln to catch up'''
-        if config.kiln_must_catch_up == True:
+        if self.must_catch_up:
             temp = self.thermocouple_temperature()
             # kiln too cold, wait for it to heat up
-            if self.state.target - temp > config.pid_control_window:
-                log_throttling.by_time(log, interval=config.log_throttle).warn(
+            if self.state.target - temp > self.control_window:
+                log_throttling.by_time(log, interval=log_throttle).warn(
                         "kiln must catch up, too cold, shifting schedule")
                 self.update_start_time()
                 self.state.catchup()
             # kiln too hot, wait for it to cool down
-            elif temp - self.state.target > config.pid_control_window:
-                log_throttling.by_time(log, interval=config.log_throttle).warn(
+            elif temp - self.state.target > self.control_window:
+                log_throttling.by_time(log, interval=log_throttle).warn(
                         "kiln must catch up, too hot, shifting schedule")
                 self.update_start_time()
                 self.state.catchup()
@@ -139,13 +143,13 @@ class Oven(threading.Thread):
 
     def save_automatic_restart_state(self):
         # only save state if the feature is enabled
-        if config.automatic_restarts:
+        if self.restart:
             return self.state.store()
         return False
 
     def automatic_restart(self) -> bool:
         # only automatic restart if the feature is enabled
-        if not config.automatic_restarts:
+        if not self.restart:
             return False
         if self.state.too_old():
             duplog.warning("automatic restart not possible. state file does not exist or is too old.")
@@ -233,18 +237,18 @@ class RealOven(Oven):
 class SimulatedOven(Oven):
 
     def __init__(self):
-        self.t_env = config.sim_t_env
-        self.c_heat = config.sim_c_heat
-        self.c_oven = config.sim_c_oven
-        self.p_heat = config.sim_p_heat
-        self.R_o_nocool = config.sim_R_o_nocool
-        self.R_ho_noair = config.sim_R_ho_noair
+        self.t_env = config.get_temp('oven.simulation.t_env')[0]
+        self.c_heat = config.get('oven.simulation.c_heat')
+        self.c_oven = config.get('oven.simulation.c_oven')
+        self.p_heat = config.get('oven.simulation.p_heat')
+        self.R_o_nocool = config.get('oven.simulation.R_o_nocool')
+        self.R_ho_noair = config.get('oven.simulation.R_ho_noair')
         self.R_ho = self.R_ho_noair
-        self.speedup_factor = config.sim_speedup_factor
+        self.speedup_factor = config.get('oven.simulation.speedup_factor', 1)
 
         # set temps to the temp of the surrounding environment
-        self.t = config.sim_t_env  # deg C or F temp of oven
-        self.t_h = self.t_env #deg C temp of heating element
+        self.t = self.t_env     # Temp of oven
+        self.t_h = self.t_env   # Temp of heating element
 
         super().__init__()
 

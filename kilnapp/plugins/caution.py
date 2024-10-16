@@ -1,7 +1,7 @@
 import logging
 import time
-import config
-import digitalio
+
+from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
@@ -24,9 +24,6 @@ from kilnapp.plugins import hookimpl, KilnPlugin
 class Caution(KilnPlugin):
     '''This represents a GPIO output that controls a
     status LED which indicates caution or a failure.
-        config.caution_gpio
-        config.caution_invert
-        config.caution_verbose
     '''
     def __init__(self):
         super().__init__(__name__)
@@ -35,28 +32,21 @@ class Caution(KilnPlugin):
         self.record_caution("Okay")
 
         # Read Caution LED GPIO
+        pin = config.get_pin('plugins.caution.led.gpio.pin')
         try:
-            self.led = digitalio.DigitalInOut(config.caution_gpio)
+            import digitalio
+            self.led = digitalio.DigitalInOut(pin)
             self.led.direction = digitalio.Direction.OUTPUT
             self.simulated = False
         except:
             self.simulated = True
 
         # Read Caution LED active-high or active-low
-        try:
-            self.off = config.caution_invert
-        except:
-            self.off = False
+        self.off = config.get('plugins.caution.led.gpio.inverted', False)
         self.on = not self.off
         self.turnled(self.off)
 
-        # Quiet Caution during simulation for debugging
-        try:
-            self.verbose = config.caution_verbose
-        except:
-            self.verbose = False
-        if self.simulated and self.verbose:
-            log.warning("Caution disabled during simulation")
+        self.verbose = config.get_log_subsystem('caution')
 
         self.clearfail()
 

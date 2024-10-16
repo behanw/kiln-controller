@@ -6,12 +6,18 @@ import re
 import time
 import logging
 import log_throttling
-import config
+
+from settings import config, NoSettingError
 
 log = logging.getLogger(__name__)
+log_throttle = config.get('general.logging.throttle', 60)
+
+default_kp = config.get('oven.pid.kp', 10)
+default_ki = config.get('oven.pid.ki', 80)
+default_kd = config.get('oven.pid.kd', 220.83497910261562)
 
 class PID(object):
-    def __init__(self, kp: float=config.pid_kp, ki: float=config.pid_ki, kd: float=config.pid_kd):
+    def __init__(self, kp: float=default_kp, ki: float=default_ki, kd: float=default_kd):
         self.lastNow = datetime.datetime.now()
         self.time = 0
         self.timeDelta = 0
@@ -29,11 +35,13 @@ class PID(object):
         self.output = 0
 
         try:
-            self.throttle_below_temp = config.throttle_below_temp
-            self.throttle_percent = config.throttle_percent / 100
+            self.throttle_below_temp = config.get_temp('oven.throttle_below_temp')
+            self.throttle_percent = config.get_percent('oven.throttle_percent')
             self.throttle = True
-        except AttributeError:
+        except NoSettingError:
             self.throttle = False
+
+        self.control_window = config.get_temp('oven.pid_control_window')
 
     def get(self):
         return {
@@ -66,25 +74,21 @@ class PID(object):
         self.ispoint = ispoint
         error = setpoint - ispoint
 
-        # This removes the need for config.stop_integral_windup
-        # it turns the controller into a binary on/off switch
-        # any time it's outside the window defined by
-        # config.pid_control_window
         self.errDelta = 0
-        if error < (-config.pid_control_window):
-            log_throttling.by_time(log, interval=config.log_throttle).warn(
+        if error < -self.control_window:
+            log_throttling.by_time(log, interval=log_throttle).warn(
                     "Kiln outside pid control window, max cooling")
             output = 0
             # it is possible to set self.iterm=0 here and also below
             # but I dont think its needed
-        elif error > (1 * config.pid_control_window):
-            log_throttling.by_time(log, interval=config.log_throttle).warn(
+        elif error > self.control_window:
+            log_throttling.by_time(log, interval=log_throttle).warn(
                     "Kiln outside pid control window, max heating")
             if self.throttle and setpoint <= self.throttle_below_temp:
                 output = self.throttle_percent
-                log_throttling.by_time(log, interval=config.log_throttle).warn(
+                log_throttling.by_time(log, interval=log_throttle).warn(
                         "max heating throttled at {}% below {} degrees to prevent overshoot"
-                        .format(config.throttle_percent, self.throttle_below_temp))
+                        .format(self.throttle_percent, self.throttle_below_temp))
             else:
                 output = 1
         else:
@@ -106,20 +110,20 @@ class PID(object):
         return self.output
 
 
-try:
-    # Global, because if a class variable, it can't be used as a default argument
-    state_directory = config.automatic_restart_state_directory
-except AttributeError:
-    try:
-        state_directory = config.topdir
-    except AttributeError:
-        state_directory = os.path.abspath(os.path.dirname(__file__), '..')
-state_file = os.path.abspath(os.path.join(state_directory, 'state.pkl'))
+def get_element_kw():
+    elements = config.get('oven.element')
+    watts = 0
+    for element in elements.values():
+        watts += element['watts']
+    log.info("Heating elements are {} Watts".format(watts))
+    return watts / 1000
+
+# Global, because if a class variable, it can't be used as a default argument
+state_file = config.get_file_at_location('general.location.restartdir', 'state.pkl', 'TOPDIR')
 log.info("Looking for restart info at {}".format(state_file))
 
 class OvenState(object):
     prefix = "ext_"
-    minutes_too_old = config.automatic_restart_window
 
     def __init__(self, firing_profile=None, runtime=0, scale=1):
         self.idle()
@@ -153,9 +157,13 @@ class OvenState(object):
         self.pid = PID()
 
         # Current power rate, currency and cost of firing
-        self.kwh_rate = config.kwh_rate
-        self.currency_type = config.currency_type
+        self.kwh_rate = config.get('general.cost.kwh_rate')
+        self.currency_type = config.get('general.cost.currency_type')
         self.cost = 0
+
+        self.kw_elements = get_element_kw()
+
+        self.time_step = config.get('oven.duty_cycle')
 
     def set(self, key: str, value: str) -> None:
         self.__dict__[self.prefix + key] = value
@@ -188,7 +196,7 @@ class OvenState(object):
 
     def log_heat_state(self, heat_on_time, heat_off_time):
         try:
-            log_throttling.by_time(log, interval=config.log_throttle).debug("temp={:.2f}, target={:.2f}, error={:.2f}, pid={:.2f}, p={:.2f}, i={:.2f}, d={:.2f}, heat_on={:.2f}, heat_off={:.2f}, run_time={:.2f}, total_time={:.2f}, time_left={:.2f}".format(
+            log_throttling.by_time(log, interval=log_throttle).debug("temp={:.2f}, target={:.2f}, error={:.2f}, pid={:.2f}, p={:.2f}, i={:.2f}, d={:.2f}, heat_on={:.2f}, heat_off={:.2f}, run_time={:.2f}, total_time={:.2f}, time_left={:.2f}".format(
                 self.pid.ispoint, self.pid.setpoint, self.pid.lastErr, self.pid.rawOutput,
                 self.pid.pterm, self.pid.iterm, self.pid.dterm,
                 heat_on_time, heat_off_time, self.runtime, self.totaltime,
@@ -214,7 +222,8 @@ class OvenState(object):
             now = time.time()
             status_age = os.path.getmtime(state_file)
             minutes_age = (now - status_age) / 60
-            return minutes_age > self.minutes_too_old
+            minutes_too_old = config.get_time_in_unit('general.restart.window', 'm')
+            return minutes_age > minutes_too_old
         except FileNotFoundError:
             return True
 
@@ -275,14 +284,14 @@ class OvenState(object):
         return "{}{:.2f}".format(self.currency_type, self.cost)
     def update_cost(self):
         if self.heat:
-            self.cost += (self.kwh_rate * config.kw_elements) * ((self.heat) / 3600)
+            self.cost += (self.kwh_rate * self.kw_elements) * ((self.heat) / 3600)
 
     def update_target_temp(self):
         self.target = self.profile.get_target_temperature(self.runtime) if self.profile else 0
 
     def pid_compute(self, temp: float, now: datetime.datetime) -> tuple:
         pid = self.pid.compute(self.target, temp, now)
-        time_step = config.sensor_time_wait
+        time_step = self.duty_cycle
         heat_on_time = time_step * pid
         heat_off_time = time_step * (1 - pid)
 

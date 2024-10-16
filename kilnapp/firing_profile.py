@@ -1,43 +1,30 @@
-import config
 import json
 import math
 import os
-
 import logging
-logging.basicConfig(level=config.log_level, format=config.log_format)
-log = logging.getLogger("kiln-controller")
 
-def convert_temp(temp, converto):
-    if converto == 'c':
-        temp = round((temp - 32) * 5 / 9)
-    else:
-        temp = math.ceil(temp * 9 / 5 + 32)
-    return temp
+from settings import config
+
+log = logging.getLogger(__name__)
 
 def convert_profile(fprofile, converto):
-    if fprofile["temp_units"] == converto:
+    (fromunit, tounit) = (fprofile['temp_units'].upper(), converto.upper())
+    if fromunit == tounit:
         return fprofile
-    fprofile["data"] = [ [duration, convert_temp(temp, converto)] for (duration, temp) in fprofile["data"] ]
-    fprofile["temp_units"] = converto
+    fprofile["data"] = [ [duration, config.temp_to_unit(temp, fromunit, tounit)[0]]
+                        for (duration, temp) in fprofile["data"] ]
+    fprofile["temp_units"] = tounit
     return fprofile
 
-def convert_to_temp_scale(fprofile):
+def convert_to_tempunit(fprofile):
     if "temp_units" not in fprofile:
-        fprofile["temp_units"] = 'f'
-    if config.temp_scale == fprofile["temp_units"]:
+        fprofile["temp_units"] = 'F'
+    if config.is_temp_unit(fprofile["temp_units"]):
         return fprofile
-    elif config.temp_scale == 'f' and fprofile["temp_units"] == 'c':
-        return convert_profile(fprofile, 'f')
+    elif fprofile["temp_units"].upper() == 'F' and config.is_temp_unit('C'):
+        return convert_profile(fprofile, 'C')
     else:
-        return convert_profile(fprofile, 'c')
-
-def add_temp_units(fprofile):
-    """
-    always store the temperature in degrees c
-    this way folks can share profiles
-    """
-    fprofile['temp_units'] = config.temp_scale
-    return convert_profile(fprofile, 'c')
+        return convert_profile(fprofile, 'F')
 
 def add_rate(fprofile):
     data = fprofile["data"]
@@ -63,17 +50,15 @@ def add_rate(fprofile):
     fprofile["rates"] = rates
     return fprofile
 
-def get_filename(name):
-    if not name.endswith(".json"):
-        name += ".json"
-    return os.path.join(config.kiln_profiles_directory, name)
+def get_filename(filename):
+    if not filename.endswith(".json"):
+        filename += ".json"
+    return config.get_file_at_location('server.location.profiles', filename)
 
 def read_profile(name):
     with open(get_filename(name), 'r') as f:
-        return(add_rate(convert_to_temp_scale(json.load(f))))
-
-def read_all():
-    return [ read_profile(name) for name in os.listdir(config.kiln_profiles_directory) if name.endswith(".json") ]
+        fprofile = convert_to_tempunit(json.load(f))
+        return add_rate(fprofile)
 
 class Firing_Profile():
     """The Firing_Profile Class"""
@@ -90,7 +75,11 @@ class Firing_Profile():
 
     @staticmethod
     def get_all_json():
-        return json.dumps(read_all())
+        profile_dir = config.get_location('server.location.profiles')
+        all_profiles = [ read_profile(name)
+                        for name in os.listdir(profile_dir)
+                        if name.endswith(".json") ]
+        return json.dumps(all_profiles)
 
     @staticmethod
     def load(name):
@@ -102,8 +91,9 @@ class Firing_Profile():
         if not force and os.path.exists(filepath):
             log.error("Could not write, {} already exists".format(filepath))
             return False
+        fprofile['temp_units'] = config.get_tempunit()
         with open(filepath, 'w+') as f:
-            f.write(json.dumps(add_temp_units(fprofile)))
+            f.write(json.dumps(convert_profile(fprofile, 'C')))
         log.info("Wrote {}".format(filepath))
         return True
 

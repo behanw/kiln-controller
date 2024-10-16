@@ -1,8 +1,8 @@
 import time
 import logging
-import config
 import digitalio
 
+from settings import config
 from .plugins import plugin_manager
 
 log = logging.getLogger(__name__)
@@ -11,14 +11,14 @@ class Output(object):
     '''This represents a GPIO output that controls a solid
     state relay to turn the kiln elements on and off.
     inputs
-        config.gpio_heat
-        config.gpio_heat_invert
     '''
     def __init__(self):
         self.active = False
-        self.heater = digitalio.DigitalInOut(config.gpio_heat)
+        pin = config.get_pin('plugins.heater.ssr.main.gpio.pin',
+                             "No GPIO specified for turning on the heat relay")
+        self.heater = digitalio.DigitalInOut(pin)
         self.heater.direction = digitalio.Direction.OUTPUT
-        self.off = config.gpio_heat_invert
+        self.off = config.get('plugins.heat.ssr.main.gpio.inverted', False)
         self.on = not self.off
 
     def heat(self,sleepfor):
@@ -40,7 +40,7 @@ class Board(object):
 
     @staticmethod
     def get():
-        if config.simulate == True:
+        if config.get('general.simulate', False):
             return SimulatedBoard()
         else:
             return RealBoard()
@@ -62,7 +62,6 @@ class RealBoard(Board):
 
 class SimulatedBoard(Board):
     '''Simulated board used during simulations.
-    See config.simulate
     '''
     def __init__(self):
         self.name = "simulated"

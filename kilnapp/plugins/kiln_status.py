@@ -1,5 +1,6 @@
 import logging
-import config
+
+from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 

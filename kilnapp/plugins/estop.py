@@ -1,7 +1,7 @@
 import logging
-import config
 import time
-import digitalio
+
+from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
@@ -11,9 +11,6 @@ class Estop(KilnPlugin):
     '''This reads the state of the estop button.
     Although the estop directly controls power to the kiln,
     this GPIO allows us to know if it's been pushed or not.
-        config.estop_gpio
-        config.estop_invert
-        config.estop_quiet
     '''
     def __init__(self):
         super().__init__(__name__)
@@ -22,26 +19,19 @@ class Estop(KilnPlugin):
 
         # Read Estop Button GPIO
         try:
-            self.button = digitalio.DigitalInOut(config.estop_gpio)
+            import digitalio
+            pin = config.get_pin('plugins.estop.switch.gpio.pin')
+            self.button = digitalio.DigitalInOut(pin)
             self.button.direction = digitalio.Direction.INPUT
             self.simulated = False
         except:
             self.simulated = True
 
         # Read Estop Button active-high or active-low
-        try:
-            self.released = config.estop_invert
-        except:
-            self.released = False
+        self.released = config.get('plugins.estop.switch.gpio.inverted', False)
         self.pressed = not self.released
 
-        # Quiet Estop during simulation for debugging
-        try:
-            self.quiet = config.estop_quiet
-        except:
-            self.quiet = False
-        if self.simulated and self.quiet:
-            log.warning("Estop disabled during simulation")
+        self.verbose = config.get_log_subsystem('estop')
 
     def record_estop(self, status: str) -> None:
         self.hook.record_meta(info={"estop": status})

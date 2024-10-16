@@ -4,16 +4,10 @@ import math
 import time
 import statistics
 
-import config
-from kilnapp.settings import has_setting, setting, ifsetting, ignore_compare
+from settings import config, NoSettingError
+#from kilnapp.settings import ignore_compare
 
 log = logging.getLogger("plugins." + __name__)
-
-def convert_to_fahrenheit(temp):
-    return temp * 9 / 5 + 32
-
-def no_conversion(temp):
-    return temp
 
 class TempSamples(object):
     '''TempSamples averages thermocouple readings and calculates heating rate.
@@ -21,8 +15,8 @@ class TempSamples(object):
     def __init__(self):
         self.samples = []
 
-        self.temp_count = setting("temperature_average_samples", 10)
-        self.rate_count = setting("heat_rate_samples", 60)
+        self.temp_count = config.get('plugins.thermocouple.temperature_average_samples', 10)
+        self.rate_count = config.get('plugins.thermocouple.heat_rate_samples', 60)
 
         self.count = max(self.temp_count, self.rate_count)
 
@@ -56,10 +50,9 @@ class ThermocoupleStatus(object):
        over the last two duty cycles.
     '''
     def __init__(self):
-        #self.size = config.temperature_average_samples * 2
-        self.size = setting("temperature_average_samples", 10) * 2
+        self.limit = config.get('plugins.thermocouple.error_limit', 30)
+        self.size = config.get('plugins.thermocouple.temperature_average_samples', 10) * 2
         self.status = [True for i in range(self.size)]
-        self.limit = 30
 
     def good(self):
         '''True is good!'''
@@ -89,14 +82,12 @@ class Thermocouple(object):
         self.name = name
         self.offset = offset
         self.status = ThermocoupleStatus()
-        self.convert = ifsetting("temp_scale", "f", convert_to_fahrenheit, no_conversion)
 
 class ThermocoupleSimulated(Thermocouple):
     '''Simulates a temperature sensor '''
-    def __init__(self, name: str, chipselect=0, typecode: str="K", offset=0):
+    def __init__(self, name: str, offset=0):
         super().__init__(name, offset)
-        #self.simulated_temperature = config.sim_t_env
-        self.simulated_temperature = setting("sim_t_env")
+        self.simulated_temperature = config.get_temp('oven.simulation.t_env')[0]
 
     def temperature(self):
         return self.simulated_temperature
@@ -105,7 +96,6 @@ class ThermocoupleReal(Thermocouple):
     '''real temperature sensor that takes many measurements
        during the time_step
        inputs
-           config.temperature_average_samples
     '''
     def __init__(self, name: str, chipselect, offset=0):
         super().__init__(name, offset)
@@ -117,22 +107,25 @@ class ThermocoupleReal(Thermocouple):
         self.cs = digitalio.DigitalInOut(self.chipselect)
 
     def spi_setup(self):
-        #if has_setting('spi_sclk', 'spi_mosi', 'spi_miso'):
-        if(hasattr(config, 'spi_sclk') and
-           hasattr(config, 'spi_mosi') and
-           hasattr(config, 'spi_miso')):
+        try:
             import adafruit_bitbangio as bitbangio
-            self.spi = bitbangio.SPI(config.spi_sclk, config.spi_mosi, config.spi_miso)
-            log.info("Software SPI selected for reading thermocouple")
-        else:
-            import board
-            self.spi = board.SPI();
-            log.info("Hardware SPI selected for reading thermocouple")
+            sclk = config.get_pin('plugins.thermocouple.hw.spi.sclk')
+            mosi = config.get_pin('plugins.thermocouple.hw.spi.mosi')
+            miso = config.get_pin('plugins.thermocouple.hw.spi.miso')
+            self.spi = bitbangio.SPI(sclk, mosi, miso)
+            log.info("Software/Bit-bang SPI selected for reading thermocouple")
+        except NoSettingError:
+            try:
+                import board
+                self.spi = board.SPI();
+                log.info("Hardware SPI selected for reading thermocouple")
+            except:
+                raise FileNotFoundError("No SPI found or configured")
 
     def sample_temperature(self, timestamp):
         '''read temp from tc and convert if needed'''
         try:
-            sample = math.ceil(self.convert(self.raw_temp()) + self.offset)
+            sample = math.ceil(config.c_to_tempunit(self.raw_temp()) + self.offset)
             self.samples.add(timestamp, sample)
             self.status.good()
         except ThermocoupleError as tce:
@@ -151,43 +144,32 @@ class ThermocoupleReal(Thermocouple):
         '''average temp over a duty cycle'''
         return self.averagetemp.get_temp()
 
+error_ignore_list = config.get('plugins.thermocouple.mitigations.ignore_errors')
 
 class ThermocoupleError(Exception):
     '''
     thermocouple exception parent class to handle mapping of error messages
     and make them consistent across adafruit libraries. Also set whether
-    each exception should be ignored based on settings in config.py.
+    each exception should be ignored based on settings in config.yaml.
     '''
     def __init__(self, message):
-        self.ignore = True
+        super().__init__(message)
         self.message = message
-        if not hasattr(self.__dict__, 'map'):
-            self.orig_message = message
-            self.map = {}
-        self.map['Unsupported Thermocouple'] = 'Unsupported Thermocouple'
-        self.map['Not connected'] = 'Not connected'
-        self.map_message()
-        self.set_ignore()
-        super().__init__(self.message)
+        self.ignore = False
 
-    def set_ignore(self):
-        if ignore_compare(self.message, "Not connected", "ignore_tc_lost_connection") \
-            or ignore_compare(self.message, "Short circuit", "ignore_tc_short_errors") \
-            or ignore_compare(self.message, "Unknown", "ignore_tc_unknown_error") \
-            or ignore_compare(self.message, "Cold junction range fault", "ignore_tc_cold_junction_range_error") \
-            or ignore_compare(self.message, "Thermocouple range fault", "ignore_tc_range_error") \
-            or ignore_compare(self.message, "Cold junction temp too high", "ignore_tc_cold_junction_temp_high") \
-            or ignore_compare(self.message, "Cold junction temp too low", "ignore_tc_cold_junction_temp_low") \
-            or ignore_compare(self.message, "Thermocouple temp too high", "ignore_tc_temp_high") \
-            or ignore_compare(self.message, "Thermocouple temp too low", "ignore_tc_temp_low") \
-            or ignore_compare(self.message, "Voltage too high or low", "ignore_tc_voltage_error"):
+        if self.message.startswith('Unsupported'):
+            pass
+        elif self.is_ignored('Not connected', 'ignore_tc_lost_connection') \
+                or self.is_ignored('Unknown', 'ignore_tc_unknown_error'):
             self.ignore = True
 
-    def map_message(self):
-        try:
-            self.message = self.map[self.orig_message]
-        except KeyError:
-            self.message = "unknown"
+    def is_ignored(self, error, flag, replacement=None):
+        if self.message.startswith(error):
+            if replacement:
+                self.message = replacement
+            return flag in error_ignore_list
+        return False
+
 
 class Max31855(ThermocoupleReal):
     '''Each subclass expected to handle errors and get temperature
@@ -210,22 +192,15 @@ class Max31855(ThermocoupleReal):
             raise Max31855_Error('unknown')
 
 class Max31855_Error(ThermocoupleError):
-    '''
-    All children must set self.orig_message and self.map
-    '''
     def __init__(self, message):
-        self.orig_message = message
-        # this purposefully makes "fault reading" and
-        # "Total thermoelectric voltage out of range..." unknown errors
-        self.map = {
-            "Thermocouple not connected" : "Not connected",
-            "Short circuit to ground" : "Short circuit",
-            "Short circuit to power" : "Short circuit",
-            "faulty reading" : "Fault",
-            "Total thermoelectric voltage out of range:-30.164012584223183": "Fault",
-            "Only supports K-Type thermocouples": "Unsupported Thermocouple",
-            }
         super().__init__(message)
+
+        if self.ignored \
+                or self.is_ignored('Thermocouple not connected', 'ignore_tc_lost_connection') \
+                or self.is_ignored('Short circuit', 'ignore_tc_short_errors') \
+                or self.is_ignored('faulty reading', 'ignore_tc_faulty_reading') \
+                or self.is_ignored('Total thermoelectric voltage out of range', 'ignore_tc_range_error'):
+            self.ignored = True
 
 class Max31856(ThermocoupleReal):
     '''each subclass expected to handle errors and get temperature'''
@@ -237,7 +212,8 @@ class Max31856(ThermocoupleReal):
         self.thermocouple = adafruit_max31856.MAX31856(self.spi, self.cs,
                                thermocouple_type=self.thermo_type(typecode))
 
-        freq = setting(ac_freq_hz, 60, "ac_freq_hz not set in config. Assuming 60Hz")
+        freq = config.get('plugins.thermocouple.mitigations.ac_freq_hz', 60,
+                          "ac_freq_hz not set in config. Assuming 60Hz")
         if freq in [50, 60]:
             self.thermocouple.noise_rejection = freqs[freq]
         else:
@@ -275,65 +251,63 @@ class Max31856(ThermocoupleReal):
 
 class Max31856_Error(ThermocoupleError):
     def __init__(self, message):
-        self.orig_message = message
-        self.map = {
-            "cj_range" : "Cold junction range fault",
-            "tc_range" : "Thermocouple range fault",
-            "cj_high"  : "Cold junction temp too high",
-            "cj_low"   : "Cold junction temp too low",
-            "tc_high"  : "Thermocouple temp too high",
-            "tc_low"   : "Thermocouple temp too low",
-            "voltage"  : "Voltage too high or low",
-            "open_tc"  : "Not connected",
-            "not_supported": "Unsupported Thermocouple",
-            }
         super().__init__(message)
+
+        if self.message == 'not_supported':
+            self.message = 'Unsupported Thermocouple'
+        if self.ignored \
+                or self.is_ignored('cj_high', 'ignore_tc_cold_junction_temp_high', 'Cold junctuin temp too high') \
+                or self.is_ignored('cj_low', 'ignore_tc_cold_junction_temp_low', 'Cold junctuin temp too low') \
+                or self.is_ignored('cj_range', 'ignore_tc_cold_junction_range_error', 'Cold junctuin range fault') \
+                or self.is_ignored('open_tc', 'ignore_tc_lost_connection', 'Not connected') \
+                or self.is_ignored('tc_high', 'ignore_tc_temp_high', 'Thermocouple temp too high') \
+                or self.is_ignored('tc_low', 'ignore_tc_temp_low', 'Thermocouple temp too low') \
+                or self.is_ignored('tc_range', 'ignore_tc_range_error', 'Thermocouple range fault') \
+                or self.is_ignored('voltage', 'ignore_tc_voltage_error', 'Voltage too high or low'):
+            self.ignored = True
 
 
 from kilnapp.plugins import hookimpl, KilnPlugin
 
 class Thermocouples(KilnPlugin):
-    def __init__(self, sensors):
+    def __init__(self):
         super().__init__(__name__)
         self.thermocouples = []
 
-        try:
-            self.time_step = config.sensor_time_wait
-        except AttributeError:
-            self.time_step = 2
+        self.verbose = config.get_log_subsystem('thermocouple')
 
-        try:
-            self.numsamples = config.temperature_average_samples
-        except AttributeError:
-            self.numsamples = 10
-
+        self.time_step = config.get('oven.duty_cycle')
+        self.numsamples = config.get('plugins.thermocouple.temperature_average_samples', 10)
         self.sleeptime = self.time_step / self.numsamples
+        self.emergency_shutoff_temp = config.get_temp('oven.emergency_shutoff_temp')
 
         interfaces = {
-                "simulated": ThermocoupleSimulated,
                 "max31855": Max31855,
                 "max31856": Max31856,
                 }
 
+        sensors = config.get('plugins.thermocouple.hw.device', None, 'No Sensors specified in config')
         for name, sensor in sensors.items():
             (chip, chipselect, thermo, offset) = sensor
-            if config.simulate:
-                chip = "simulated"
-                offset = 0
             try:
-                self.thermocouples.append(interfaces[chip](name, chipselect, thermo, offset))
-            except AttributeError:
-                raise ThermocoupleError("Not connected")
+                if config.get('general.simulate', False):
+                    self.thermocouples.append(ThermocoupleSimulated(name, 0))
+                else:
+                    chip = interfaces[sensor['chip']]
+                    chipselect = config.get_pin('plugins.thermocouple.hw.device.{}.chipselect'.format(name)) 
+                    self.thermocouples.append(chip(name, chipselect, sensor['type'], sensor['offset']))
+            except (AttributeError, KeyError) as error:
+                raise ThermocoupleError("Thermocouple configuration error: {}".format(error))
 
     def is_too_hot(self):
         '''reset if the temperature is way TOO HOT, or other critical errors detected'''
-        if (temp >= config.emergency_shutoff_temp):
+        if (temp >= self.emergency_shutoff_temp):
             log.critical("Emergency!!! temperature too high")
             self.hook.failure(info={
                 "reason": "Emergency!!! temperature too high",
                 "pattern": "fail2"
                 })
-            if config.ignore_temp_too_high == False:
+            if 'ignore_temp_too_high' not in error_ignore_list:
                 self.abort_run()
 
         elif self.board.thermocouple.status.over_error_limit():
@@ -342,7 +316,7 @@ class Thermocouples(KilnPlugin):
                 "reason": "Emergency!!! too many errors in a short period",
                 "pattern": "fail3"
                 })
-            if config.ignore_tc_too_many_errors == False:
+            if 'ignore_tc_too_many_errors' not in error_ignore_list:
                 self.abort_run()
 
 
@@ -394,11 +368,6 @@ thermocoupleObj = None
 
 @hookimpl
 def start_plugin():
-    try:
-        sensors = config.thermocouple
-    except AttributeError:
-        raise ThermocoupleError("No Sensors specified in config")
-
     global thermocoupleObj
-    thermocoupleObj = Thermocouples(sensors)
+    thermocoupleObj = Thermocouples()
     thermocoupleObj.start()

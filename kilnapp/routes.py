@@ -4,7 +4,7 @@ import sys
 import logging
 import json
 
-import config
+from settings import config
 from .plugins import hookimpl, plugin_manager
 from .oven import Oven
 from .ovenWatcher import OvenWatcher
@@ -24,25 +24,20 @@ log = logging.getLogger(__name__)
 app = bottle.Bottle()
 
 # Webserver paths
-try:
-    public = config.public_directory
-except AttributeError:
-    public = os.path.abspath(os.path.join(os.path.dirname(__file__), "public"))
-assets = os.path.join(public, "assets")
+public = config.get_location('server.location.public')
+assets = config.get_file_at_location('server.location.public', 'assets')
 
 # Configure Jinja2 templates
-try:
-    template_dir = config.template_directory
-except AttributeError:
-    template_dir = 'kilnapp/templates'
+template_dir = config.get_location('server.location.templates')
 template_env = Environment(loader=FileSystemLoader(template_dir))
 
 # Render Jinja2 templates
 def render_template(template_name, **context):
     return template_env.get_template(template_name).render(context)
 
+web_verbose = config.get_log_subsystem('web')
 def logi(message: str):
-    if 'web' in config.log_subsystem:
+    if web_verbose:
         log.info(message)
 
 @app.route('/')
@@ -221,13 +216,13 @@ def handle_storage():
     logi("websocket (storage) closed")
 
 
-def get_config():
-    return json.dumps({"temp_scale": config.temp_scale,
-        "time_scale_slope": config.time_scale_slope,
-        "time_scale_profile": config.time_scale_profile,
-        "kwh_rate": config.kwh_rate,
-        "currency_type": config.currency_type})
-
+web_config = json.dumps({
+        "temp_scale": config.get_tempunit(),
+        "time_scale_slope": config.get_rateunit(),
+        "time_scale_profile": config.get_timeunit(),
+        "kwh_rate": config.get('general.cost.kwh_rate'),
+        "currency_type": config.get('general.cost.currency_type'),
+    })
 
 @app.route('/config')
 def handle_config():
@@ -236,7 +231,7 @@ def handle_config():
     while True:
         try:
             message = wsock.receive()
-            wsock.send(get_config())
+            wsock.send(web_config)
         except WebSocketError:
             break
         time.sleep(1)

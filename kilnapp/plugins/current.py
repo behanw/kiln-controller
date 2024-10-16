@@ -1,17 +1,10 @@
-import time
-import logging
-import config
 import array
+import logging
 import math
 import threading
-import array
+import time
 
-import board
-import digitalio
-import busio
-import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.ads1x15 import Comp_Mode, Mode
-from adafruit_ads1x15.analog_in import AnalogIn
+from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
@@ -19,32 +12,31 @@ from kilnapp.plugins import hookimpl, KilnPlugin
 
 pgafsr = [ 6.2114, 4.096, 2.048, 1.024, 0.512, 0.256 ]
 
-class SCT013(threading.Thread):
+class SCT013(object):
     amps = 0
 
-    def __init__(self, chan, name="clamp"):
+    def __init__(self, adc, chan, sensor, name="clamp"):
         threading.Thread.__init__(self)
         self.daemon = True
-
         self.chan = chan
         self.name = name
+        self.sample_count = config.get('plugins.current.samples')
 
-        self.vstep = pgafsr[config.current_pga] / pow(2, config.current_adc_bits - 1)
-        self.ratio = config.current_sensoramps[0] / config.current_sensoramps[1]
-        self.burdenres = config.current_burden_res
+        self.vstep = pgafsr[adc['pga_gain']] / pow(2, adc['bits'] - 1)
+        self.ratio = sensor['inputamps'] / sensor['outputamps']
+        self.burdenres = sensor['burden_res']
         self.multiplier = self.ratio / self.burdenres
-        self.period = config.current_period
 
-        self.check_burdenres()
+        self.check_burdenres(sensor['inputamps'], sensor['outputamps'], adc['vcc'])
         #log.info("{} Multiplier: {}".format(self.name, self.multiplier))
 
-    def check_burdenres(self):
-        inputamps = config.current_inputamps
-        sensoramps = config.current_sensoramps
-        outputamps = sensoramps[1] * inputamps / sensoramps[0]
-        suggested_burdenres = round(config.current_vcc / 2 / outputamps)
+    def check_burdenres(self, sensor_in_amps, sensor_out_amps, vcc):
+        maxamps = config.get('plugins.current.maxamps')
+        outputamps = sensor_out_amps * maxamps / sensor_in_amps
+        suggested_burdenres = round(vcc / 2 / sensor_out_amps)
         if(not math.isclose(a=suggested_burdenres, b=self.burdenres, rel_tol=20)):
-            log.warning("Burden resistor should be about {}, but it is set to {}".format(suggested_burdenres, self.burdenres))
+            log.warning("Burden resistor should be about {}, but it is set to {}"
+                        .format(suggested_burdenres, self.burdenres))
 
         #vburden = outputamps * burdenres
         #fsrange = pgafsr[count.current_pga]
@@ -55,36 +47,33 @@ class SCT013(threading.Thread):
         ##return round(inputamps / counts, 8)
 
     def sample(self):
-        count = config.current_samples
         maxVolts = 0
-        for i in range(count):
+        for i in range(self.sample_count):
             try:
                 value = self.chan.value * self.vstep
                 maxVolts = max(maxVolts, abs(value))
             except OSError:
                 log.warning("{}: I2C Input/output error, skipping sample".format(self.name))
                 continue
-        self.amps = maxVolts * self.multiplier
-        if self.amps < 0.02:
-            self.amps = 0
-
+        amps = maxVolts * self.multiplier
+        if amps < 0.02: amps = 0
         #log.info("Name: {}  Max: {}  Amps: {}".format(self.name, maxVolts, round(self.amps,3)))
+        return amps
 
     def sample_rms(self):
         data = array.array('f')
-        count = config.current_samples
         summation = 0.0
         sumsquare = 0.0
         maxValue = 0
-        for i in range(count):
+        for i in range(self.sample_count):
             value = self.chan.value * self.vstep
             data.append(value)
             maxValue = max(maxValue, abs(value))
             summation += value
             sumsquare += value * value
 
-        bias = summation / count
-        variance = sumsquare / count - bias * bias
+        bias = summation / self.sample_count
+        variance = sumsquare / self.sample_count - bias * bias
         stddev = math.sqrt(variance)
         threshold = bias + 3 * stddev
 
@@ -101,22 +90,10 @@ class SCT013(threading.Thread):
             else:
                 log.warning("Throwing away {}".format(value))
 
-        vrms = 0
-        if n > 0:
-            vrms = math.sqrt(accum / n)
-
-        self.amps= vrms * self.ratio / self.burdenres
-
-        #log.info(csv)
-        log.info("Name: {}  Max: {}  VRMS: {}  Amps: {}".format(self.name, maxValue, round(vrms,6), round(self.amps,3)))
-
-    def run(self):
-        while True:
-            self.sample()
-            time.sleep(self.period)
-
-    def get_amps(self):
-        return (self.name, self.amps)
+        vrms = math.sqrt(accum / n) if n > 0 else 0
+        amps = vrms * self.ratio / self.burdenres
+        log.info("Name: {}  Max: {}  VRMS: {}  Amps: {}".format(self.name, maxValue, round(vrms,6), round(amps,3)))
+        return amps
 
     def __str__(self):
         return "{}: {} Amps".format(self.name, round(self.amps, 3))
@@ -125,55 +102,49 @@ class SCT013(threading.Thread):
 class Current(KilnPlugin):
     '''This thread reads 2 SCT013 Current clamps from
     a ADS1115 ADC.
-        config.current_verbose
-        config.current_gpio       = board.D25 # ALRT pin
-        config.current_period     = 2 # Seconds
-        config.current_pga        = 4
-        config.current_adc_rate   = 860 # Samples per second
-        config.current_samples    = 256 # Samples
-        config.current_sensoramps = (100, 0.050) # Amps
-        config.current_inputamps  = 30 # Amps
-        config.current_vcc        = 5 # Volts
-        config.current_burden_res = 150 # Ohms
-        config.current_adc_bits   = 16 # bits
     '''
-
-    sensor = []
 
     def __init__(self):
         super().__init__(__name__)
 
-        #try:
-        self.period = config.current_period
+        self.sensor = {}
+        self.period = config.get_time_in_unit('plugins.current.period', 's')
 
-        i2c = busio.I2C(board.SCL, board.SDA)
-        ads = ADS.ADS1115(i2c)
-        ads.gain = config.current_pga
-        ads.data_rate = config.current_adc_rate
-        ads.mode = Mode.CONTINUOUS
-        ads.comparator_mode = Comp_Mode.TRADITIONAL
+        try:
+            import board
+            import busio
+            i2c = busio.I2C(board.SCL, board.SDA)
 
-        # ALRT pin
-        self.ready = digitalio.DigitalInOut(config.current_gpio)
-        self.ready.direction = digitalio.Direction.INPUT
+            adc_config = config.get('plugins.current.hw.adc')
 
-        self.sensor.append(SCT013(AnalogIn(ads, ADS.P0, ADS.P1), "upper_amps"))
-        self.sensor.append(SCT013(AnalogIn(ads, ADS.P2, ADS.P3), "lower_amps"))
+            import adafruit_ads1x15.ads1115 as ADS
+            ads = ADS.ADS1115(i2c)
+            ads.gain = adc_config['pga_gain']
+            ads.data_rate = adc_config['rate']
 
-        self.sensor[0].start()
-        self.sensor[1].start()
+            from adafruit_ads1x15.ads1x15 import Comp_Mode, Mode
+            ads.mode = Mode.CONTINUOUS
+            ads.comparator_mode = Comp_Mode.TRADITIONAL
 
-        self.simulated = False
-        #except:
-        #    self.simulated = True
+            # ALRT pin
+            import digitalio
+            alrt = config.get_pin('plugins.current.hw.adc.alert-gpio')
+            self.ready = digitalio.DigitalInOut(alrt)
+            self.ready.direction = digitalio.Direction.INPUT
+
+            from adafruit_ads1x15.analog_in import AnalogIn
+            mapping = [ ADS.P0, ADS.P1, ADS.P2, ADS.P3 ]
+            sensors = config.get('plugins.current.hw.sensors')
+            for name, sensor in sensors.items():
+                channels = [ mapping[pin] for pin in sensor["channel"] ]
+                self.sensor[name] = SCT013(adc_config, AnalogIn(ads, *channels), sensor, name)
+
+            self.simulated = False
+        except:
+            self.simulated = True
 
         # Quiet Current during simulation for debugging
-        try:
-            self.verbose = config.current_verbose
-        except:
-            self.verbose = False
-        if self.simulated and self.verbose:
-            log.warning("Current disabled during simulation")
+        self.verbose = config.get_log_subsystem('current')
 
     # This method will be executed when the thread starts
     def run(self):
@@ -181,9 +152,8 @@ class Current(KilnPlugin):
 
         while True:
             info = {}
-            for sensor in self.sensor:
-                #self.hook.record_meta(info={sensor.name: round(sensor.amps, 2)})
-                info[sensor.name] = round(sensor.amps, 2)
+            for name, sensor in self.sensor.items():
+                info[name] = round(sensor.sample(), 2)
                 if self.verbose:
                     log.info(sensor)
             self.hook.record_meta(info=info)
