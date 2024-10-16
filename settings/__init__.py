@@ -19,6 +19,10 @@ class NoSettingError(SettingsError):
     def __init__(self, message):
         super().__init__(message)
 
+class InvalidSettingError(SettingsError):
+    def __init__(self, message):
+        super().__init__(message)
+
 class UnitError(SettingsError):
     def __init__(self, message):
         super().__init__(message)
@@ -28,6 +32,10 @@ class NoUnitError(SettingsError):
         super().__init__(message)
 
 class SettingToHighError(SettingsError):
+    def __init__(self, message):
+        super().__init__(message)
+
+class Simulation(SettingsError):
     def __init__(self, message):
         super().__init__(message)
 
@@ -250,16 +258,35 @@ class Settings(object):
     def get_rateunit(self):
         return self.rateunit
 
-    def get_pin(self, name: str, helpmsg="Missing pin assignment"):
-        import board
-        value = self.get(name, None, helpmsg).split('.')
+    def to_pin(self, name: str):
+        value = name.split('.')
         try:
+            import board
             if value[0] == 'board':
                 return board.__dict__[value[1]]
             else:
-                raise NoSettingError("{}: Invalid board pin assignment".format(name))
+                raise InvalidSettingError("{} Not a board pin assignment".format(name))
         except IndexError:
-            raise NoSettingError("{}: Invalid board pin assignment".format(name))
+            raise InvalidSettingError("{} Invalid board pin assignment".format(name))
+
+    def get_pin(self, name: str, ignore=False, helpmsg="Missing pin assignment"):
+        try:
+            return self.to_pin(self.get(name, None, helpmsg))
+        except NoSettingError as error:
+            if not ignore:
+                raise error
+
+    def get_gpio(self, name: str, helpmsg="Missing gpio assignment"):
+        """ Assumes there is a pin and inverted value to read.
+        Returns a tuple of the 2 values """
+        try:
+            gpio = self.get(name, None, helpmsg)
+            if type(gpio) == str and gpio == "simulated": raise Simulation
+            pin = self.to_pin(gpio['pin'])
+            inverted = gpio['inverted'] if 'inverted' in gpio else False
+            return (pin, inverted)
+        except KeyError:
+            raise InvalidSettingError(helpmsg)
 
     def has_setting(self, *names) -> bool:
         try:

@@ -1,6 +1,5 @@
 import time
 import logging
-import digitalio
 
 from settings import config
 from .plugins import plugin_manager
@@ -14,12 +13,13 @@ class Output(object):
     '''
     def __init__(self):
         self.active = False
-        pin = config.get_pin('plugins.heater.ssr.main.gpio.pin',
+        (pin, self.off)  = config.get_gpio('plugins.heater.relay.main.gpio',
                              "No GPIO specified for turning on the heat relay")
+        self.on = not self.off
+
+        import digitalio
         self.heater = digitalio.DigitalInOut(pin)
         self.heater.direction = digitalio.Direction.OUTPUT
-        self.off = config.get('plugins.heat.ssr.main.gpio.inverted', False)
-        self.on = not self.off
 
     def heat(self,sleepfor):
         self.heater.value = self.on

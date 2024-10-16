@@ -17,19 +17,18 @@ class Estop(KilnPlugin):
         self.active = True
         self.record_estop("Okay")
 
-        # Read Estop Button GPIO
+        # Read Estop Button GPIO, active-high or active-low
         try:
+            (pin, self.released) = config.get_gpio('plugins.estop.switch.gpio')
+            self.pressed = not self.released
+
             import digitalio
-            pin = config.get_pin('plugins.estop.switch.gpio.pin')
             self.button = digitalio.DigitalInOut(pin)
             self.button.direction = digitalio.Direction.INPUT
+
             self.simulated = False
         except:
             self.simulated = True
-
-        # Read Estop Button active-high or active-low
-        self.released = config.get('plugins.estop.switch.gpio.inverted', False)
-        self.pressed = not self.released
 
         self.verbose = config.get_log_subsystem('estop')
 

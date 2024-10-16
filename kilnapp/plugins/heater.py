@@ -1,7 +1,7 @@
 import logging
 import time
 
-from settings import config
+from settings import config, InvalidSettingError
 
 log = logging.getLogger("plugins." + __name__)
 
@@ -10,34 +10,51 @@ from kilnapp.plugins import hookimpl, KilnPlugin
 # Heat on/off
 # Cost calculation
 
+def get_element(name: str):
+    # Oven
+    ovenmeta = config.get('oven.element')
+    # Current sensors
+    # Heater relays
+
 class Heater(object):
     '''This represents a GPIO output that controls a solid
     state relay to turn the kiln elements on and off.
     inputs
     '''
-    def __init__(self):
+    def __init__(self, name):
         self.active = False
+        self.name = name
+
+        # Read Heater GPIO, active-high or active-low
         try:
+            (pin, self.off) = config.get_gpio('plugins.heater.relay.{}.gpio'.format(name))
+            self.on = not self.off
+
             import digitalio
-            pin = config.get_pin('plugins.heater.ssr.main.gpio.pin')
             self.heater = digitalio.DigitalInOut(pin)
             self.heater.direction = digitalio.Direction.OUTPUT
+
             self.simulated = False
         except:
             self.simulated = True
 
-        # Read Heater active-high or active-low
-        self.off = config.get('plugins.heater.ssr.main.gpio.inverted', False)
-        self.on = not self.off
+        self.percentage = config.get_percent('plugins.relay.{}.percentage'.format(name))
 
         self.verbose = config.get_log_subsystem('heater')
 
-    def heat(self,sleepfor):
+    def heaton(self):
         self.heater.value = self.on
-        time.sleep(sleepfor)
 
-    def cool(self,sleepfor):
-        '''no active cooling, so sleep'''
+    def heatoff(self):
         self.heater.value = self.off
-        time.sleep(sleepfor)
 
+class Relays(object):
+    def __init__(self):
+        devices = config.get('plugins.heater.relay', None, 'No heaters specified')
+        self.heaters = {}
+
+        for name, device in devices.items():
+            if device['type'] == 'element':
+                self.heaters[name] = Heater(name, device)
+            else:
+                raise InvalidSettingError("Unsupported relay type: {}({})".format(name, device['type']))

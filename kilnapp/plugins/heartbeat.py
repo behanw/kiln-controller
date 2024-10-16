@@ -23,19 +23,18 @@ class Heartbeat(KilnPlugin):
     def __init__(self):
         super().__init__(__name__)
 
-        # Read Heartbeat GPIO
+        # Read Heartbeat GPIO, active-high or active-low
         try:
+            (pin, self.off) = config.get_gpio('plugins.heartbeat.led.gpio')
+            self.on = not self.off
+
             import digitalio
-            pin = config.get_pin('plugins.heartbeat.led.gpio.pin')
             self.led = digitalio.DigitalInOut(pin)
             self.led.direction = digitalio.Direction.OUTPUT
+
             self.simulated = False
         except:
             self.simulated = True
-
-        # Read Heartbeat active-high or active-low
-        self.off = config.get('plugins.heartbeat.led.gpio.inverted', False)
-        self.on = not self.off
 
         # Read Heartbeat period
         self.period = config.get_time_in_unit('plugins.heartbeat.period', 's')

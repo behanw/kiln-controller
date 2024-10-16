@@ -31,20 +31,19 @@ class Caution(KilnPlugin):
         self.pattern = Pattern["off"]
         self.record_caution("Okay")
 
-        # Read Caution LED GPIO
-        pin = config.get_pin('plugins.caution.led.gpio.pin')
+        # Read Caution LED GPIO, active-high or active-low
         try:
+            (pin, self.off) = config.get_gpio('plugins.caution.led.gpio')
+            self.on = not self.off
+
             import digitalio
             self.led = digitalio.DigitalInOut(pin)
             self.led.direction = digitalio.Direction.OUTPUT
+            self.turnled(self.off)
+
             self.simulated = False
         except:
             self.simulated = True
-
-        # Read Caution LED active-high or active-low
-        self.off = config.get('plugins.caution.led.gpio.inverted', False)
-        self.on = not self.off
-        self.turnled(self.off)
 
         self.verbose = config.get_log_subsystem('caution')
 
