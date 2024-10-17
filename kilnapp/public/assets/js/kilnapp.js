@@ -158,6 +158,48 @@ function updateProfileTable() {
     }
 }
 
+const cones_in_C_slow = {
+  0: '', 540: 'Quartz', 570: '', 586: '022', 600: '021', 626: '020', 678:
+  '019', 715: '018', 738: '017', 772: '016', 791: '015', 807: '014', 837:
+  '013', 861: '012', 875: '011', 903: '010', 920: '09', 942: '08', 976:
+  '07', 998: '06', 1015: '05.5', 1031: '05', 1063: '04', 1086: '03',
+  1102: '02', 1119: '01', 1137: '1', 1142: '2', 1152: '3', 1162: '4',
+  1186: '5', 1203: '5.5', 1222: '6', 1239: '7', 1249: '8', 1260: '9',
+  1285: '10', 1293: '11', 1304: '12'
+}
+
+const cones_in_C_fast = {
+  0: '', 540: 'Quartz', 570: '', 590: '022', 617: '021', 638: '020', 695:
+  '019', 734: '018', 763: '017', 796: '016', 818: '015', 838: '014', 861:
+  '013', 882: '012', 894: '011', 915: '010', 930: '09', 956: '08', 987:
+  '07', 1013: '06', 1025: '05.5', 1044: '05', 1077: '04', 1104: '03',
+  1122: '02', 1138: '01', 1154: '1', 1164: '2', 1170: '3', 1183: '4',
+  1207: '5', 1225: '5.5', 1243: '6', 1257: '7', 1271: '8', 1280: '9',
+  1305: '10', 1312: '11', 1324: '12',
+}
+
+function temp2cone(inputTemp, rate) {
+    if (Math.abs(rate) < 100 ) {
+        scale = cones_in_C_slow
+    } else {
+        scale = cones_in_C_fast
+    }
+    const temps = Object.keys(scale).map(Number).sort((a, b) => a - b);
+    let lastTemp = null;
+    for (const temp of temps) {
+        if (inputTemp >= temp - 5 && inputTemp <= temp) {
+            return scale[temp];
+        } else if (temp <= inputTemp) {
+            cone = scale[temp];
+	}
+    }
+    if (cone.length > 0) {
+        return `${cone}+`;
+    } else {
+        return '';
+    }
+}
+
 function updateProfileTableRate() {
     convertProfile2Rate();
 
@@ -168,7 +210,8 @@ function updateProfileTableRate() {
     var html = '<h3>Schedule Rates</h3><div class="form-switch" style="align: right; margin: -3em 0 0 15em;"><label class="switch"><input type="checkbox" checked><span class="slider round"></span></div>';
         html += '<div class="table-responsive" style="scroll: none"><table class="table table-striped">';
         html += '<tr><th style="width: 50px">#</th><th>Rate in &deg;' + temp_scale_display + '/' + time_scale_slope
-                + '</th><th>Target Temperature in &deg;' + temp_scale_display + '</th><th>Hold Time in ' + time_scale_profile + '</th></tr>';
+                + '</th><th>Target Temperature in &deg;' + temp_scale_display
+                + '</th><th>Cone Number</th><th>Hold Time in ' + time_scale_profile + '</th></tr>';
 
     for (var i=0; i<graph.rate.data.length; i++) {
         dph = graph.rate.data[i][0];
@@ -179,11 +222,14 @@ function updateProfileTableRate() {
         } else if (dph == 0) {
             slope = "right"; color="grey";
         }
+        temp = graph.rate.data[i][1];
+        hold = graph.rate.data[i][2];
 
         html += '<tr><td><h4>' + (i+1) + '</h4></td>';
         html += '<td><div class="input-group"><span class="glyphicon glyphicon-circle-arrow-' + slope + ' input-group-addon ds-trend" style="background: ' + color + '"></span><input type="text" class="form-control" id="profiletable-0-' + i + '" value="' + formatDPH(dph) + '" style="width: 60px" /></div></td>';
-        html += '<td><input type="text" class="form-control" id="profiletable-1-' + i + '" value="' + graph.rate.data[i][1] + '" style="width: 60px" /></td>';
-        html += '<td><input type="text" class="form-control" id="profiletable-2-' + i + '" value="' + timeProfileFormatter(graph.rate.data[i][2], true) + '" style="width: 60px" /></td>';
+        html += '<td><input type="text" class="form-control" id="profiletable-1-' + i + '" value="' + temp + '" style="width: 60px" /></td>';
+        html += '<td><input type="text" class="form-control ds-input" readonly value="' + temp2cone(temp, dph) + '" style="width: 100px" /></td>';
+        html += '<td><input type="text" class="form-control" id="profiletable-2-' + i + '" value="' + timeProfileFormatter(hold, true) + '" style="width: 60px" /></td>';
         html += '<td>&nbsp;</td></tr>';
     }
 
