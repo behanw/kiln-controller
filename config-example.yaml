@@ -36,7 +36,7 @@ general: # General options
       #- caution
       #- current
       #- estop
-      #- heater
+      #- relay
       #- heartbeat
       #- statustest
       #- thermocouple
@@ -183,9 +183,10 @@ plugins:
       gpio: 
         pin: board.D24 # GPIO pin that reads estop state
         inverted: False # Inverted logic if a 1 is off
-  heater: # Output to control the relay
-    ssr:
+  relay: # Output to control the relay
+    device:
       main:
+        type: heater
         gpio: 
           pin: board.D23  # GPIO pin that controls the relay
           inverted: False # Inverted logic if a 1 is off
@@ -193,6 +194,16 @@ plugins:
         element:
           - upper
           - lower
+        thermocouple:
+          - main
+      alternate:
+        type: heater
+        gpio: simulated # For testing the idea of more than one SSR
+        percentage: 50% # How much of the time is applied to this relay
+        element:
+          - upper
+        thermocouple:
+          - main
   heartbeat:
     period: 2s
     led:

@@ -13,7 +13,7 @@ class Output(object):
     '''
     def __init__(self):
         self.active = False
-        (pin, self.off)  = config.get_gpio('plugins.heater.relay.main.gpio',
+        (pin, self.off)  = config.get_gpio('plugins.relay.device.main.gpio',
                              "No GPIO specified for turning on the heat relay")
         self.on = not self.off
 
