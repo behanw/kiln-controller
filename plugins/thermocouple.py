@@ -5,7 +5,6 @@ import time
 import statistics
 
 from settings import config, NoSettingError
-#from kilnapp.settings import ignore_compare
 
 log = logging.getLogger("plugins." + __name__)
 
@@ -267,7 +266,7 @@ class Max31856_Error(ThermocoupleError):
             self.ignored = True
 
 
-from kilnapp.plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin
 
 class Thermocouples(KilnPlugin):
     def __init__(self):

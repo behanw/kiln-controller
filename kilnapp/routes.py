@@ -5,7 +5,7 @@ import logging
 import json
 
 from settings import config
-from .plugins import hookimpl, plugin_manager
+from plugins import hookimpl, plugin_manager
 from .oven import Oven
 from .ovenWatcher import OvenWatcher
 from .firing_profile import Firing_Profile

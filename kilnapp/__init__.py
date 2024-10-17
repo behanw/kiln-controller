@@ -2,7 +2,7 @@ import logging
 from settings import config
 log = logging.getLogger(__name__)
 
-from .plugins import plugin_manager
+from plugins import plugin_manager
 from .routes import app
 plugin_manager.hook.start_plugin()
 

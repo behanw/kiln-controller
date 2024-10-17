@@ -8,7 +8,7 @@ from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
-from kilnapp.plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin
 
 pgafsr = [ 6.2114, 4.096, 2.048, 1.024, 0.512, 0.256 ]
 

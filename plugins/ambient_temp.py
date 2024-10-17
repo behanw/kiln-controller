@@ -6,7 +6,7 @@ import time
 log = logging.getLogger("plugins." + __name__)
 
 from settings import config
-from kilnapp.plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin
 
 class OneWire(object):
     path = "/sys/bus/w1/devices/"

@@ -14,7 +14,7 @@ Pattern = {
         (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, 1) ]
 }
 
-from kilnapp.plugins import hookimpl, KilnPlugin, plugin_manager
+from plugins import hookimpl, KilnPlugin, plugin_manager
 
 class Heartbeat(KilnPlugin):
     '''This represents a GPIO output that controls a

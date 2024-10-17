@@ -5,7 +5,7 @@ from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
-from kilnapp.plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin
 
 class StatusTest(KilnPlugin):
     '''Testing of the status hooks for plugins.

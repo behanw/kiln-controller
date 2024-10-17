@@ -5,7 +5,7 @@ from settings import config, InvalidSettingError
 
 log = logging.getLogger("plugins." + __name__)
 
-from kilnapp.plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin
 
 # Heat on/off
 # Cost calculation

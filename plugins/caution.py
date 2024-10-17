@@ -19,7 +19,7 @@ Pattern = {
         (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, 1) ]
 }
 
-from kilnapp.plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin
 
 class Caution(KilnPlugin):
     '''This represents a GPIO output that controls a

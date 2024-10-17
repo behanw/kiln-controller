@@ -2,7 +2,7 @@ import time
 import logging
 
 from settings import config
-from .plugins import plugin_manager
+from plugins import plugin_manager
 
 log = logging.getLogger(__name__)
 
