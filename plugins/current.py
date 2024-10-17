@@ -8,7 +8,7 @@ from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
-from plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin, plugin_manager
 
 pgafsr = [ 6.2114, 4.096, 2.048, 1.024, 0.512, 0.256 ]
 
@@ -159,10 +159,8 @@ class Current(KilnPlugin):
             self.hook.record_meta(info=info)
             time.sleep(self.period)
 
-currentObj = None
+    @hookimpl
+    def start_plugin(self):
+        self.start()
 
-@hookimpl
-def start_plugin():
-    global currentObj
-    currentObj = Current()
-    currentObj.start()
+plugin_manager.register(Current())

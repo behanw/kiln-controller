@@ -5,11 +5,10 @@ from settings import config, InvalidSettingError
 
 log = logging.getLogger("plugins." + __name__)
 
-from plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin, plugin_manager
 
 # Heat on/off
 # Cost calculation
-
 
 def get_oven_elements():
     return config.get('oven.element').keys()
@@ -80,9 +79,8 @@ class Relays(object):
             else:
                 raise InvalidSettingError("Unsupported relay type: {}({})".format(name, device['type']))
 
-relaysObj = None
+    @hookimpl
+    def start_plugin(self):
+        pass
 
-@hookimpl
-def start_plugin():
-    global relayObj
-    relayObj = Relays()
+plugin_manager.register(Relays())

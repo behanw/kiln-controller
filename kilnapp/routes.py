@@ -5,7 +5,7 @@ import logging
 import json
 
 from settings import config
-from plugins import hookimpl, plugin_manager
+from plugins import plugin_manager
 from .oven import Oven
 from .ovenWatcher import OvenWatcher
 from .firing_profile import Firing_Profile
@@ -16,6 +16,7 @@ from jinja2 import Environment, FileSystemLoader
 from geventwebsocket import WebSocketError
 
 kiln = Oven.getOven()
+plugin_manager.register(kiln)
 kilnWatcher = OvenWatcher(kiln)
 # this kilnwatcher is used in the oven class for restarts
 kiln.set_ovenwatcher(kilnWatcher)

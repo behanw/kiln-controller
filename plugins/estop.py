@@ -5,7 +5,7 @@ from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
-from plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin, plugin_manager
 
 class Estop(KilnPlugin):
     '''This reads the state of the estop button.
@@ -76,11 +76,8 @@ class Estop(KilnPlugin):
                 self.record_estop("Okay")
             time.sleep(self.period)
 
-estopObj = None
+    @hookimpl
+    def start_plugin(self):
+        self.start()
 
-@hookimpl
-def start_plugin():
-    global estopObj
-    estopObj = Estop()
-    estopObj.start()
-
+plugin_manager.register(Estop())

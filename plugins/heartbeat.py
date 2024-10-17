@@ -80,17 +80,8 @@ class Heartbeat(KilnPlugin):
     def activity(self):
         self.resetCountdown()
 
-#heartbeatObj = None
+    @hookimpl
+    def start_plugin(self):
+        self.start()
 
-@hookimpl
-def start_plugin():
-    #global heartbeatObj
-    heartbeatObj = Heartbeat()
-    plugin_manager.register(heartbeatObj)
-    heartbeatObj.start()
-
-#@hookimpl
-#def activity():
-#    # Reset countdown
-#    if heartbeatObj:
-#        heartbeatObj.resetCountdown()
+plugin_manager.register(Heartbeat())

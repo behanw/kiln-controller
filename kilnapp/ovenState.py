@@ -8,6 +8,7 @@ import logging
 import log_throttling
 
 from settings import config, NoSettingError
+from plugins import hookimpl
 
 log = logging.getLogger(__name__)
 log_throttle = config.get('general.logging.throttle', 60)
@@ -35,13 +36,13 @@ class PID(object):
         self.output = 0
 
         try:
-            self.throttle_below_temp = config.get_temp('oven.throttle_below_temp')
+            self.throttle_below_temp = config.get_temp('oven.throttle_below_temp')[0]
             self.throttle_percent = config.get_percent('oven.throttle_percent')
             self.throttle = True
         except NoSettingError:
             self.throttle = False
 
-        self.control_window = config.get_temp('oven.pid_control_window')
+        self.control_window = config.get_temp('oven.pid_control_window')[0]
 
     def get(self):
         return {
@@ -257,12 +258,15 @@ class OvenState(object):
     def get_totaltime(self):
         return self.totaltime
 
+    @hookimpl
     def get_time(self):
-        return {
+        times = {
                 'start_time': self.start_time,
                 'runtime': self.runtime,
                 'totaltime': self.totaltime,
                 }
+        log.info("get_time: {}", times)
+        return times
 
 
     def catchup(self):
@@ -270,15 +274,16 @@ class OvenState(object):
     def caughtup(self):
         self.catching_up = False
 
-    def set_temperatures(self, meta):
-        #log.info("meta: {}".format(meta))
+    @hookimpl
+    def record_meta(self, info: dict):
+        for key, value in info.items():
+            self.set(key, value)
+
+    @hookimpl
+    def record_temperature(self, info):
         for key in ['temperature', 'heat_rate', 'thermocouples']:
-            #log.info("key: {}".format(key))
-            #log.info("key[{}]: {}".format(key, meta[key]))
-            if key in meta:
-                #log.info("key[{}]: {}".format(key, meta[key]))
-                self.__dict__[key] = meta[key]
-        #log.info("temp: {}".format(self.temperature))
+            if key in info:
+                self.__dict__[key] = info[key]
 
     def get_cost(self):
         return "{}{:.2f}".format(self.currency_type, self.cost)
@@ -291,7 +296,7 @@ class OvenState(object):
 
     def pid_compute(self, temp: float, now: datetime.datetime) -> tuple:
         pid = self.pid.compute(self.target, temp, now)
-        time_step = self.duty_cycle
+        time_step = self.time_step
         heat_on_time = time_step * pid
         heat_off_time = time_step * (1 - pid)
 

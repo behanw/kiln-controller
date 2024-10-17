@@ -6,7 +6,7 @@ import time
 log = logging.getLogger("plugins." + __name__)
 
 from settings import config
-from plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin, plugin_manager
 
 class OneWire(object):
     path = "/sys/bus/w1/devices/"
@@ -84,10 +84,8 @@ class AmbientTemp(KilnPlugin):
             self.hook.record_meta(info=info)
             time.sleep(self.period)
 
-ambientObj = None
+    @hookimpl
+    def start_plugin(self):
+        self.start()
 
-@hookimpl
-def start_plugin():
-    global ambientObj
-    ambientObj = AmbientTemp()
-    ambientObj.start()
+plugin_manager.register(AmbientTemp())

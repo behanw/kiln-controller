@@ -5,7 +5,7 @@ from settings import config
 
 log = logging.getLogger("plugins." + __name__)
 
-from plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin, plugin_manager
 
 class StatusTest(KilnPlugin):
     '''Testing of the status hooks for plugins.
@@ -33,12 +33,8 @@ class StatusTest(KilnPlugin):
             if not self.simulated:
                 self.play(self.pattern)
 
-testStatusObj = None
+    @hookimpl
+    def start_plugin(self):
+        log.info("Starting Test Status")
 
-@hookimpl
-def start_plugin():
-    log.info("Starting Test Status")
-    #global testStatusObj
-    #testStatusObj = StatusTest()
-    #testStatusObj.start()
-
+plugin_manager.register(StatusTest())

@@ -69,8 +69,6 @@ class Oven(threading.Thread):
             return RealOven()
 
     def thermocouple_temperature(self) -> float:
-        #temp = self.board.thermocouple.temperature()
-        #self.state.set_temperature(temp)
         temp = self.state.temperature
         return temp
 
@@ -78,7 +76,7 @@ class Oven(threading.Thread):
         log.debug('run_profile run on thread' + threading.current_thread().name)
 
         runtime = startat * 60
-        if selt.seek_start and self.state.idling() and startat == 0:
+        if self.seek_start and self.state.idling() and startat == 0:
             temp = self.thermocouple_temperature()
             runtime += firing_profile.get_start_from_temperature(temp)
         self.reset(firing_profile, runtime)
@@ -91,20 +89,21 @@ class Oven(threading.Thread):
         time.sleep(1)
         self.ovenwatcher.record(self.state.profile) ### FIXME?
 
-    def end_run(self):
+    @hookimpl
+    def abort_run(self):
         self.reset()
         self.remove_automatic_restart_state()
 
-    def abort_run(self):
+    def end_run(self):
         name = self.state.profile.name
-        self.end_run()
+        self.abort_run()
         raise FiringProfileEnded("Finished firing profile {}".format(name))
 
     def reset_if_finished(self):
         if self.state.finished():
             log.info("Firing Profile ended: shutting down (total cost = {})".format(
                 self.state.get_cost()))
-            self.abort_run()
+            self.end_run()
 
     def update_start_time(self, scale=1):
         self.state.set_start_time(datetime.datetime.now() \
@@ -121,7 +120,7 @@ class Oven(threading.Thread):
     def kiln_must_catch_up(self):
         '''shift the whole schedule forward in time by one time_step
         to wait for the kiln to catch up'''
-        if self.must_catch_up:
+        if self.must_catchup:
             temp = self.thermocouple_temperature()
             # kiln too cold, wait for it to heat up
             if self.state.target - temp > self.control_window:
@@ -174,7 +173,7 @@ class Oven(threading.Thread):
 
         self.state.resume()
         startat = laststate.runtime / 60
-        log.info("Automatically restarting firing profile {} at {} minutes".format(
+        log.warning("Automatically restarting firing profile {} at {} minutes".format(
             self.state.profile.name, round(startat, 2)))
         time.sleep(1)
         self.ovenwatcher.record(self.state.profile) ### FIXME?

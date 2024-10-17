@@ -19,7 +19,7 @@ Pattern = {
         (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, 1) ]
 }
 
-from plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin, plugin_manager
 
 class Caution(KilnPlugin):
     '''This represents a GPIO output that controls a
@@ -47,17 +47,22 @@ class Caution(KilnPlugin):
 
         self.verbose = config.get_log_subsystem('caution')
 
-        self.clearfail()
+        self.clear_failure()
 
     def record_caution(self, status: str) -> None:
         self.hook.record_meta(info={"caution": status})
 
-    def setfail(self, info):
+    @hookimpl
+    def failure(self, info):
+        log.info("Failure: {}".format(info["reason"]))
         self.fail = info["reason"]
         self.pattern = Pattern[info["pattern"] or "fail"]
         self.record_caution("Fail")
 
-    def clearfail(self):
+    @hookimpl
+    def clear_failure(self, info=None):
+        if info:
+            log.info("Clear Failure: {}".format(info['reason']))
         self.fail = False
         self.pattern = Pattern["off"]
         self.record_caution("Okay")
@@ -85,22 +90,8 @@ class Caution(KilnPlugin):
             if not self.simulated:
                 self.play(self.pattern)
 
-cautionObj = None
+    @hookimpl
+    def start_plugin(self):
+        self.start()
 
-@hookimpl
-def start_plugin():
-    global cautionObj
-    cautionObj = Caution()
-    cautionObj.start()
-
-@hookimpl
-def failure(info):
-    log.info("Failure: {}".format(info["reason"]))
-    if cautionObj != None:
-        cautionObj.setfail(info)
-
-@hookimpl
-def clear_failure(info):
-    log.info("Clear Failure: {}".format(info["reason"]))
-    if cautionObj != None:
-        cautionObj.clearfail()
+plugin_manager.register(Caution())

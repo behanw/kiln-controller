@@ -266,7 +266,7 @@ class Max31856_Error(ThermocoupleError):
             self.ignored = True
 
 
-from plugins import hookimpl, KilnPlugin
+from plugins import hookimpl, KilnPlugin, plugin_manager
 
 class Thermocouples(KilnPlugin):
     def __init__(self):
@@ -278,7 +278,7 @@ class Thermocouples(KilnPlugin):
         self.time_step = config.get('oven.duty_cycle')
         self.numsamples = config.get('plugins.thermocouple.temperature_average_samples', 10)
         self.sleeptime = self.time_step / self.numsamples
-        self.emergency_shutoff_temp = config.get_temp('oven.emergency_shutoff_temp')
+        self.emergency_shutoff_temp = config.get_temp('oven.emergency_shutoff_temp')[0]
 
         interfaces = {
                 "max31855": Max31855,
@@ -363,10 +363,8 @@ class Thermocouples(KilnPlugin):
             else:
                 log.warning("Ran out of time reading thermocouples.")
 
-thermocoupleObj = None
+    @hookimpl
+    def start_plugin(self):
+        self.start()
 
-@hookimpl
-def start_plugin():
-    global thermocoupleObj
-    thermocoupleObj = Thermocouples()
-    thermocoupleObj.start()
+plugin_manager.register(Thermocouples())

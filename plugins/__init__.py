@@ -1,19 +1,21 @@
-import os
-import sys
 import logging
+import os
 import pluggy
+import sys
 import threading
 
 from settings import config
 
 log = logging.getLogger(__name__)
 
+plugin_namespace = 'kilnctrl'
+
 # Define the hookspec
-hookspec = pluggy.HookspecMarker("kilnctrl")
-hookimpl = pluggy.HookimplMarker("kilnctrl")
+hookspec = pluggy.HookspecMarker(plugin_namespace)
+hookimpl = pluggy.HookimplMarker(plugin_namespace)
 
 # Hook implementation manager
-plugin_manager = pluggy.PluginManager("kilnctrl")
+plugin_manager = pluggy.PluginManager(plugin_namespace)
 
 class KilnPlugin(threading.Thread):
     def __init__(self, name: str="plugin"):
@@ -37,14 +39,12 @@ class KilnPlugin(threading.Thread):
         else:
             return msg
 
-from plugins import hookspecs
-plugin_manager.add_hookspecs(hookspecs)
 from plugins.hookspecs import PluginHooks
 plugin_manager.add_hookspecs(PluginHooks)
-plugin_manager.load_setuptools_entrypoints('kilnctrl')
+plugin_manager.load_setuptools_entrypoints(plugin_namespace)
 
+# Import plugins listed in the configuration
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 for name in config.get('plugins', None, "Plugin list missing").keys():
     log.debug("Register "+name)
     obj = __import__(name)
-    plugin_manager.register(obj)
