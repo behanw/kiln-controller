@@ -132,7 +132,6 @@ oven:
     speedup_factor: 100
 
 plugins:
-  kiln_status:
   ambient_temp:
     hw:
       w1:
