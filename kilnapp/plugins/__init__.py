@@ -39,6 +39,8 @@ class KilnPlugin(threading.Thread):
 
 from kilnapp.plugins import hookspecs
 plugin_manager.add_hookspecs(hookspecs)
+from kilnapp.plugins.hookspecs import PluginHooks
+plugin_manager.add_hookspecs(PluginHooks)
 plugin_manager.load_setuptools_entrypoints('kilnctrl')
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))

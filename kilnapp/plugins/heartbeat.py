@@ -14,7 +14,7 @@ Pattern = {
         (1, .1), (0, .2), (1, .1), (0, .2), (1, .1), (0, 1) ]
 }
 
-from kilnapp.plugins import hookimpl, KilnPlugin
+from kilnapp.plugins import hookimpl, KilnPlugin, plugin_manager
 
 class Heartbeat(KilnPlugin):
     '''This represents a GPIO output that controls a
@@ -76,16 +76,21 @@ class Heartbeat(KilnPlugin):
     def resetCountdown(self):
         self.countdown = self.period
 
-heartbeatObj = None
+    @hookimpl
+    def activity(self):
+        self.resetCountdown()
+
+#heartbeatObj = None
 
 @hookimpl
 def start_plugin():
-    global heartbeatObj
+    #global heartbeatObj
     heartbeatObj = Heartbeat()
+    plugin_manager.register(heartbeatObj)
     heartbeatObj.start()
 
-@hookimpl
-def activity():
-    # Reset countdown
-    if heartbeatObj:
-        heartbeatObj.resetCountdown()
+#@hookimpl
+#def activity():
+#    # Reset countdown
+#    if heartbeatObj:
+#        heartbeatObj.resetCountdown()
