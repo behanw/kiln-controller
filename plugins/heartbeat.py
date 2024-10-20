@@ -43,7 +43,7 @@ class Heartbeat(KilnPlugin):
         self.verbose = config.get_log_subsystem('heartbeat')
 
     def record_heartbeat(self, status: str) -> None:
-        self.hook.record_meta(info={"heartbeat": status})
+        self.hook.sensor_reading(info={"heartbeat": status})
 
     def play(self, pattern):
         for (state, delay) in pattern:

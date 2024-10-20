@@ -81,7 +81,7 @@ class AmbientTemp(KilnPlugin):
                 info[sensor.label] = temp
             if self.verbose:
                 log.info(info)
-            self.hook.record_meta(info=info)
+            self.hook.sensor_reading(info=info)
             time.sleep(self.period)
 
     @hookimpl

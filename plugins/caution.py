@@ -7,6 +7,7 @@ log = logging.getLogger("plugins." + __name__)
 
 Pattern = {
     "off": [(0, 1)],
+    "on": [(1, 1)],
     "fail": [(1, .2), (0, .2)],
     "fail1": [(1, .2), (0, 1)],
     "fail2": [(1, .2), (0, .2), (1, .2), (0, 1)],
@@ -50,7 +51,7 @@ class Caution(KilnPlugin):
         self.clear_failure()
 
     def record_caution(self, status: str) -> None:
-        self.hook.record_meta(info={"caution": status})
+        self.hook.sensor_reading(info={"caution": status})
 
     @hookimpl
     def failure(self, info):

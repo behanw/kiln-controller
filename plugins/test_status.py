@@ -15,7 +15,7 @@ class StatusTest(KilnPlugin):
         self.verbose = config.get_log_subsystem('statustest')
 
     @hookimpl
-    def record_meta(self, info: dict):
+    def sensor_reading(self, info: dict):
         try:
             if self.verbose:
                 log.info(info)

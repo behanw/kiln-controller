@@ -33,7 +33,7 @@ class Estop(KilnPlugin):
         self.verbose = config.get_log_subsystem('estop')
 
     def record_estop(self, status: str) -> None:
-        self.hook.record_meta(info={"estop": status})
+        self.hook.sensor_reading(info={"estop": status})
 
     def ispressed(self):
         if self.simulated:

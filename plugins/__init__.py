@@ -18,10 +18,10 @@ hookimpl = pluggy.HookimplMarker(plugin_namespace)
 plugin_manager = pluggy.PluginManager(plugin_namespace)
 
 class KilnPlugin(threading.Thread):
-    def __init__(self, name: str="plugin"):
-        threading.Thread.__init__(self)
+    def __init__(self, name: str="unknown"):
+        super().__init__()
+        self.name = 'KilnPlugin.' + name
         self.daemon = True
-        self.name = name
 
         # Simulation unless configured otherwise
         self.simulated = True
@@ -31,7 +31,7 @@ class KilnPlugin(threading.Thread):
         self.period = 1
 
     def __del__(self):
-        log.warning("Deleting {}".format(__name__))
+        log.warning("Terminating {}".format(self.name))
 
     def message(self, msg):
         if self.simulated:

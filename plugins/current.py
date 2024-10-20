@@ -156,7 +156,7 @@ class Current(KilnPlugin):
                 info[name] = round(sensor.sample(), 2)
                 if self.verbose:
                     log.info(sensor)
-            self.hook.record_meta(info=info)
+            self.hook.sensor_reading(info=info)
             time.sleep(self.period)
 
     @hookimpl
