@@ -1,5 +1,6 @@
 import logging
 import time
+import queue
 
 from settings import config, InvalidSettingError
 
@@ -7,12 +8,10 @@ log = logging.getLogger("plugins." + __name__)
 
 from plugins import hookimpl, KilnPlugin, plugin_manager
 
-# Heat on/off
-# Cost calculation
-
 def get_oven_elements():
     return config.get('oven.element').keys()
 
+# Current sensors can also be involved
 def get_current_elements():
     try:
         sensors = config.get('plugins.current.hw.sensors')
@@ -30,17 +29,21 @@ def get_current_elements():
         elements[element] = name
     return elements
 
-def get_element_watts(name: str) -> int:
-    return config.get('oven.elemenet.{}.watts'.format(name), None,
-        'Oven element "{}" does not specify how many watts is consumes'.format(name))
+def get_element_watts(elements: list) -> int:
+    watts = 0
+    for element in elements:
+        watts += config.get('oven.element.{}.watts'.format(element), None,
+            'Oven element "{}" does not specify how many watts is consumes'.format(element))
+    return watts
 
-class Heater(object):
+class Heater(KilnPlugin):
     '''This represents a GPIO output that controls a solid
     state relay to turn the kiln elements on and off.
     '''
     def __init__(self, name):
+        super().__init__('relay.heater.' + name)
         self.active = False
-        self.name = name
+        self.kwh_rate = config.get('general.cost.kwh_rate')
         base = 'plugins.relay.device.' + name
 
         # Read Heater GPIO, active-high or active-low
@@ -56,9 +59,14 @@ class Heater(object):
         except:
             self.simulated = True
 
+        #self.thermocouple = config.get(base + '.thermocouple', None, 'No thermocouples specified')
         self.percentage = config.get_percent(base + '.percentage')
         self.elements = config.get(base + '.element', None, 'No elements specified')
-        self.thermocouple = config.get(base + '.thermocouple', None, 'No thermocouples specified')
+        self.watts = get_element_watts(self.elements)
+        self.time_step = config.get_time_in_unit('oven.duty_cycle', 's')
+        self.cost_per_period = self.watts * self.time_step / (1000 * 3600)
+
+        self.queue = queue.Queue()
 
         self.verbose = config.get_log_subsystem('relay')
 
@@ -68,6 +76,36 @@ class Heater(object):
     def heatoff(self):
         self.relay.value = self.off
 
+    @hookimpl
+    def heat(self, info):
+        """Receives percentage of duty cycle to power elements"""
+        # Get fraction from pid tied to thermocouple, and add modifier for element bank
+        fraction = info[self.name]['fraction'] * self.percentage
+        self.queue.put(fraction)
+
+        # Cost calculation
+        # - cost only when power is flowing
+        self.hook.add_cost({self.name: fraction * self.cost_per_period})
+
+    def run(self):
+        log.info(self.message("Starting Heater: {}".format(self.name)))
+        self.active = True
+        while True:
+            fraction = self.queue.get()
+            if fraction:
+                self.heaton()
+                time.sleep(fraction * self.time_step)
+                self.heatoff()
+            self.queue.task_done()
+
+    @hookimpl
+    def start_plugin(self):
+        self.start()
+
+# FIXME: Simulation support:
+# - Must allow for speedup
+
+# Multiple relay/element support
 class Relays(object):
     def __init__(self):
         devices = config.get('plugins.relay.device', None, 'No relays specified')
@@ -75,12 +113,10 @@ class Relays(object):
 
         for name, device in devices.items():
             if device['type'] == 'heater':
-                self.relays[name] = Heater(name)
+                heater = Heater(name)
+                plugin_manager.register(heater)
+                self.relays[name] = heater
             else:
                 raise InvalidSettingError("Unsupported relay type: {}({})".format(name, device['type']))
-
-    @hookimpl
-    def start_plugin(self):
-        pass
 
 plugin_manager.register(Relays())
