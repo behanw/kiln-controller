@@ -46,7 +46,7 @@ class Oven(threading.Thread):
         self.daemon = True
 
         self.restart = config.get('general.restart.enable', True)
-        self.time_step = config.get('oven.duty_cycle')
+        self.time_step = config.get_time_in_unit('oven.duty_cycle', 's')
         self.seek_start = config.get('oven.seek_start', False)
         self.must_catchup = config.get('oven.must_catch_up', True)
         self.control_window = config.get_temp('oven.pid_control_window',
