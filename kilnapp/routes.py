@@ -17,6 +17,7 @@ from geventwebsocket import WebSocketError
 
 kiln = Oven.getOven()
 plugin_manager.register(kiln)
+plugin_manager.register(kiln.state)
 kilnWatcher = OvenWatcher(kiln)
 # this kilnwatcher is used in the oven class for restarts
 kiln.set_ovenwatcher(kilnWatcher)
@@ -108,12 +109,9 @@ def handle_api():
     return { "success" : True }
 
 
-@app.route('/android-chrome-192x192.png')
-@app.route('/android-chrome-512x512.png')
+@app.route('/<:re:android-chrome-.*png>')
 @app.route('/apple-touch-icon.png')
-@app.route('/favicon-16x16.png')
-@app.route('/favicon-32x32.png')
-@app.route('/favicon.ico')
+@app.route('/<:re:favicon.*>')
 @app.route('/site.webmanifest')
 def send_favicon():
     logi(bottle.request.path)

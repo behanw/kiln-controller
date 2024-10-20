@@ -164,7 +164,9 @@ class OvenState(object):
 
         self.kw_elements = get_element_kw()
 
-        self.time_step = config.get('oven.duty_cycle')
+        self.time_step = config.get_time_in_unit('oven.duty_cycle', 's')
+
+        self.confidence = 100
 
     def set(self, key: str, value: str) -> None:
         self.__dict__[self.prefix + key] = value
@@ -188,6 +190,7 @@ class OvenState(object):
                 'kwh_rate': self.kwh_rate,
                 'currency_type': self.currency_type,
                 'cost': round(self.cost, 2),
+                'confidence': self.confidence,
             }
             for key, value in self.__dict__.items():
                 if key.startswith(self.prefix):
@@ -269,28 +272,31 @@ class OvenState(object):
         return times
 
 
+    @hookimpl
+    def sensor_reading(self, info: dict):
+        for key, value in info.items():
+            self.set(key, value)
+
+    @hookimpl
+    def temperature_reading(self, info):
+        #print("Temperature: {}C  Rate: {}C/h  Confidence: {}%".format(info['temperature'], info['heat_rate'], info['confidence']))
+        for key in ['temperature', 'heat_rate', 'confidence', 'thermocouples']:
+            if key in info:
+                self.__dict__[key] = info[key]
+
     def catchup(self):
         self.catching_up = True
     def caughtup(self):
         self.catching_up = False
 
-    @hookimpl
-    def record_meta(self, info: dict):
-        for key, value in info.items():
-            self.set(key, value)
-
-    @hookimpl
-    def record_temperature(self, info):
-        for key in ['temperature', 'heat_rate', 'thermocouples']:
-            if key in info:
-                self.__dict__[key] = info[key]
-
     def get_cost(self):
         return "{}{:.2f}".format(self.currency_type, self.cost)
+    # Deprecated: Moved to relay plugin
     def update_cost(self):
         if self.heat:
             self.cost += (self.kwh_rate * self.kw_elements) * ((self.heat) / 3600)
 
+    # Called from oven
     def update_target_temp(self):
         self.target = self.profile.get_target_temperature(self.runtime) if self.profile else 0
 
