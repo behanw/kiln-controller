@@ -40,7 +40,12 @@
     <div class="display ds-num ds-heat-rate"><span id="heat_rate">---</span><span class="ds-unit" id="heat_rate_temp_scale">&deg;C</span></div>
     <div class="display ds-num ds-cost"><span id="cost">0.00</span><span class="ds-unit" id="cost"></span></div>
     <div class="display ds-num ds-text" id="state"></div>
-    <div class="display pull-right ds-state" style="padding-right:0"><span class="ds-led" id="heat">&#92;</span><span class="ds-led" id="cool">&#108;</span><span class="ds-led" id="air">&#91;</span><span class="ds-led" id="hazard">&#73;</span><span class="ds-led" id="door">&#9832;</span></div>
+    <div class="display pull-right ds-state" style="padding-right:0">
+	    <span class="ds-led" id="heat">&#92;</span>
+	    <span class="ds-led" id="cool">&#108;</span>
+	    <span class="ds-led" id="air">&#91;</span>
+	    <span class="ds-led" id="hazard">&#73;</span>
+	    <!--span class="ds-led" id="door">&#9832;</span></div-->
    </div>
    <div class="clearfix"></div>
    <div>
@@ -94,6 +99,7 @@
   </div>
   <div class="plugins plugins-default">
    <div class="ds-title-panel">
+    <div class="ds-title">Confidence</div>
     <div class="ds-title">Controller Temp</div>
     <div class="ds-title">Sitter Temp</div>
     <div class="ds-title">Upper Amps</div>
@@ -104,6 +110,7 @@
    </div>
    <div class="clearfix"></div>
    <div class="ds-panel">
+    <div class="display ds-num ds-confidence"><span id="confidence">100</span><span class="ds-unit" id="confidence_scale" >%</span></div>
     <div class="display ds-num ds-ambient"><span id="ext_ctrl_temp">20</span><span class="ds-unit" id="act_temp_scale" >&deg;C</span></div>
     <div class="display ds-num ds-ambient"><span id="ext_sitter_temp">20</span><span class="ds-unit" id="act_temp_scale" >&deg;C</span></div>
     <div class="display ds-num ds-current"><span id="ext_upper_amps">0</span><span class="ds-unit" id="amps" >A</span></div>

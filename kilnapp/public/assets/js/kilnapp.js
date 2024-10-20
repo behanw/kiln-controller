@@ -687,6 +687,7 @@ $(document).ready(function() {
                 if (heat_rate < -9999) { heat_rate = -9999; }
                 $('#heat_rate').html(heat_rate);
 
+                $('#confidence').html(parseInt(x.confidence));
                 $('#ext_ctrl_temp').html(parseInt(x.ext_ctrl_temp));
                 $('#ext_sitter_temp').html(parseInt(x.ext_sitter_temp));
                 $('#ext_upper_amps').html(parseFloat(x.ext_upper_amps));
@@ -698,10 +699,10 @@ $(document).ready(function() {
                 if (typeof x.pidstats !== 'undefined') {
                     $('#heat').html('<div class="bar" style="height:' + x.pidstats.out * 70 + '%;"></div>')
                 }
-                if (x.cool > 0.5) { $('#cool').addClass("ds-led-cool-active"); } else { $('#cool').removeClass("ds-led-cool-active"); }
-                if (x.air > 0.5) { $('#air').addClass("ds-led-air-active"); } else { $('#air').removeClass("ds-led-air-active"); }
-                if (x.temperature > hazardTemp()) { $('#hazard').addClass("ds-led-hazard-active"); } else { $('#hazard').removeClass("ds-led-hazard-active"); }
-                if ((x.door == "OPEN") || (x.door == "UNKNOWN")) { $('#door').addClass("ds-led-door-open"); } else { $('#door').removeClass("ds-led-door-open"); }
+                //if (x.cool > 0.5) { $('#cool').addClass("ds-led-cool-active"); } else { $('#cool').removeClass("ds-led-cool-active"); }
+                //if (x.air > 0.5) { $('#air').addClass("ds-led-air-active"); } else { $('#air').removeClass("ds-led-air-active"); }
+                //if (x.temperature > hazardTemp()) { $('#hazard').addClass("ds-led-hazard-active"); } else { $('#hazard').removeClass("ds-led-hazard-active"); }
+                //if ((x.door == "OPEN") || (x.door == "UNKNOWN")) { $('#door').addClass("ds-led-door-open"); } else { $('#door').removeClass("ds-led-door-open"); }
 
                 state_last = state;
             }
