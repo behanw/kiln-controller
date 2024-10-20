@@ -77,7 +77,7 @@ oven:
   # Every N seconds a decision is made about switching the relay[s]
   # on & off and for how long.
   #sensor_time_wait: 2 # Seconds
-  duty_cycle: 2 # Seconds
+  duty_cycle: 2s
 
   # If your kiln is above the starting temperature of the schedule when you
   # click the Start button... skip ahead and begin at the first point in
@@ -153,6 +153,51 @@ plugins:
       gpio: 
         pin: board.D27 # GPIO pin that controls the LED
         inverted: True # Inverted logic if a 1 is off
+  control:
+    # If your kiln is above the starting temperature of the schedule when you
+    # click the Start button... skip ahead and begin at the first point in
+    # the schedule matching the current kiln temperature.
+    seek_start: True
+
+    # This setting defines the window within which PID control occurs.
+    # Outside this window (N degrees below or above the current target)
+    # the elements are either 100% on because the kiln is too cold
+    # or 100% off because the kiln is too hot. No integral builds up
+    # outside the window. The bigger you make the window, the more
+    # integral you will accumulate. This should be a positive integer.
+    pid_control_window: 5C # Degrees
+
+    # If the current temperature is outside the pid control window,
+    # delay the schedule until it goes back inside. This allows for heating
+    # and cooling as fast as possible and not continuing until temp is reached.
+    must_catch_up: True
+
+    # low temperature throttling of elements
+    # kiln elements have lots of power and tend to drastically overshoot
+    # at low temperatures. When under the set point and outside the PID
+    # control window and below throttle_below_temp, only throttle_percent
+    # of the elements are used max.
+    # To prevent throttling, set throttle_percent to 100.
+    throttle_below_temp: 150C
+    throttle_percent: 50%
+
+    pid:
+      main:
+        # These parameters control kiln temperature change. These settings work
+        # well with the simulated oven. You must tune them to work well with
+        # your specific kiln. Note that the integral pid_ki is
+        # inverted so that a smaller number means more integral action.
+        parameters:
+          kp: 10   # Proportional 25,200,200
+          ki: 80   # Integral
+          kd: 220.83497910261562 # Derivative
+        thermocouple:
+          - main
+          - alternate
+        relay:
+          - main
+          - alternate
+
   current: # Uses ADS1115
     period: 2s # Seconds over which to read a value
     samples: 256 # Samples per period
@@ -193,16 +238,12 @@ plugins:
         element:
           - upper
           - lower
-        thermocouple:
-          - main
       alternate:
         type: heater
         gpio: simulated # For testing the idea of more than one SSR
         percentage: 50% # How much of the time is applied to this relay
         element:
           - upper
-        thermocouple:
-          - main
   heartbeat:
     period: 2s
     led:
@@ -229,6 +270,7 @@ plugins:
     mitigations: 
       ac_freq_hz: 60
 
+      minimum_confidence: 50%
       error_limit: 30
 
       # There are all kinds of emergencies that can happen including:
