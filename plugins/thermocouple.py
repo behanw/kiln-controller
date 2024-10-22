@@ -237,7 +237,10 @@ class ThermocoupleReal(Thermocouple):
                 then = datetime.datetime.now()
                 self.sample_temperature(then)
                 since_then = (datetime.datetime.now() - then).total_seconds()
-                time.sleep(sleeptime - since_then)
+                if since_then < time_step:
+                    time.sleep(time_step - since_then)
+                else:
+                    log.warning("Ran out of time reading {}".format(self.name))
 
 class Max31855(ThermocoupleReal):
     '''Each subclass expected to handle errors and get temperature
