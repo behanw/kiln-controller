@@ -54,7 +54,7 @@ server:
   location:
     templates: kilnapp/templates # Relative to topdir
     public: kilnapp/public # Relative to topdir
-    profiles: kilnapp/storage/profiles # Relative to topdir
+    profiles: storage/profiles # Relative to topdir
 
 oven:
   type: kiln

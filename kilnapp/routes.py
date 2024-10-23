@@ -6,9 +6,9 @@ import json
 
 from settings import config
 from plugins import plugin_manager
-from .oven import Oven
-from .ovenWatcher import OvenWatcher
-from .firing_profile import Firing_Profile
+from kiln.oven import Oven
+from kiln.ovenWatcher import OvenWatcher
+from kiln.firing_profile import Firing_Profile
 
 import bottle
 from jinja2 import Environment, FileSystemLoader
